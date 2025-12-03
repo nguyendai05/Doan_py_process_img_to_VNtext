@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="ocr-container">
+    <!-- Upload Section -->
+    <div class="upload-section">
+        <div id="upload-area" class="upload-area">
+            <div class="upload-icon">📷</div>
+            <p>Kéo thả ảnh vào đây hoặc click để chọn</p>
+            <p class="upload-hint">Hỗ trợ: JPG, JPEG, PNG (tối đa 5MB)</p>
+            <input type="file" id="file-input" accept=".jpg,.jpeg,.png" hidden>
+        </div>
+        <button id="process-btn" class="btn btn-primary" disabled>
+            🚀 Xử lý OCR
+        </button>
+    </div>
+
+    <!-- Preview Section -->
+    <div id="preview-section" class="preview-section hidden">
+        <h4>Ảnh đã chọn:</h4>
+        <div id="image-preview" class="image-preview"></div>
+    </div>
+
+    <!-- Results Section -->
+    <div id="results-section" class="results-section">
+        <div id="text-blocks" class="text-blocks">
+            <!-- Text blocks will be added here -->
+        </div>
+    </div>
+</div>
+
+<!-- Tools Panel -->
+<div id="tools-panel" class="tools-panel hidden">
+    <h4>🛠️ Công cụ xử lý</h4>
+    <p class="selected-text-info">Đã chọn: <span id="selected-char-count">0</span> ký tự</p>
+    <div class="tools-buttons">
+        <button class="tool-btn" data-tool="tts">🔊 Text-to-Speech</button>
+        <button class="tool-btn" data-tool="translate">🌐 Dịch</button>
+        <button class="tool-btn" data-tool="research">📚 Research</button>
+    </div>
+</div>
+{% endblock %}
