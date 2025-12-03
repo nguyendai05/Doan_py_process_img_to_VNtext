@@ -82,10 +82,11 @@ class OCRService:
         # Extract text segments
         segments = []
         for (bbox, text, confidence) in results:
+            # Convert numpy types to Python native types for JSON serialization
             segments.append({
                 'text': text,
-                'confidence': confidence,
-                'bbox': bbox
+                'confidence': float(confidence),
+                'bbox': [[int(coord) for coord in point] for point in bbox]
             })
 
         return segments
