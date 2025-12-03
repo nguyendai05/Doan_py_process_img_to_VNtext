@@ -43,7 +43,7 @@ def single_image_ocr():
         raw_text = OCRService.segments_to_text(segments)
 
         # Process text
-        processor = TextProcessor(language='en')
+        processor = TextProcessor(language='vi')
         processed_text = processor.process(raw_text)
 
         return jsonify({
