@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Python OCR{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <a href="/" class="logo">🔍 Python OCR</a>
+            <nav class="nav-mode">
+                <button class="mode-btn active" data-mode="single">Single Image</button>
+                <button class="mode-btn" data-mode="multi">Multi Image</button>
+            </nav>
+        </div>
+        <div class="header-right">
+            <div id="auth-section">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </header>
+
+    <main class="main-container">
+        <aside class="sidebar" id="sidebar">
+            <h3>📁 Work History</h3>
+            <div id="work-list" class="work-list">
+                <!-- Filled by JS -->
+            </div>
+        </aside>
+
+        <section class="content">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="modal-content" class="modal-content">
+            <!-- Modal content filled by JS -->
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
