@@ -4,11 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
-ENV/
-
-# Environment
-.env
 
 # IDE
 .vscode/
@@ -24,3 +19,40 @@ app/static/audio/
 # Database
 *.db
 *.sqlite
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+# Virtual env
+venv/
+env/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+
+# Flask instance
+instance/
+
+# Uploaded images (nếu có)
+uploads/
+media/
+temp/
+
+
+# Model files lớn
+models/
+*.pt
+*.pth
+*.h5
+
+
+# OS
+.DS_Store
+Thumbs.db
