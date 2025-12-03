@@ -1,10 +1,10 @@
 # Python OCR Web Application
 
-Ứng dụng web chuyển hình ảnh thành văn bản sử dụng EasyOCR với xử lý văn bản offline.
+Ứng dụng web chuyển hình ảnh thành văn bản sử dụng EasyOCR với xử lý văn bản oneline.
 
 ## Tính năng chính
 
-- **OCR Engine**: EasyOCR hỗ trợ tiếng Anh và tiếng Việt
+- **OCR Engine**: EasyOCR hỗ trợ tiếng Việt
 - **Xử lý văn bản offline**: Normalize, rule-based fix, spell-check (không dùng GenAI)
 - **2 chế độ xử lý**:
   - Single Image: Xử lý nhanh 1 ảnh
