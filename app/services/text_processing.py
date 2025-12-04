@@ -5,7 +5,7 @@ from spellchecker import SpellChecker
 
 class TextProcessor:
     """
-    Offline text processing for OCR output
+     text processing for OCR output
     - Unicode normalization
     - OCR error correction (rule-based)
     - Spell checking

@@ -7,11 +7,14 @@ from app.services.text_processing import TextProcessor
 
 ocr_bp = Blueprint('ocr', __name__)
 
-
+"""
+Check if file extension is allowed
+right split token to check extension
+"""
 def allowed_file(filename):
-    """Check if file extension is allowed"""
-    allowed = current_app.config.get('ALLOWED_EXTENSIONS', {'jpg', 'jpeg', 'png'})
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed
+    allowed_extension = current_app.config.get('ALLOWED_EXTENSIONS', {'jpg', 'jpeg', 'png'})
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extension
+
 
 
 @ocr_bp.route('/single', methods=['POST'])
