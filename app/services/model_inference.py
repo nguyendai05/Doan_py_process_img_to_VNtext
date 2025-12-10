@@ -4,7 +4,6 @@ import re
 import torch
 import sentencepiece
 
-print("a")
 MODEL_PATH = r"D:\\bartPho\\bartpho_correction_model"
 
 print("🔄 Loading BART model... (only once)")

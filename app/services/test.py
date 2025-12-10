@@ -20,7 +20,6 @@ class TextProcessor:
     # Bao gồm chữ cái (thường, hoa, có dấu), số, dấu cách, và dấu câu cơ bản.
     VIETNAMESE_CHARS = r"a-zàáạảãăằắặẳẵâầấậẩẫèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđA-ZÀÁẠẢÃĂẰẮẶẲẴÂẦẤẬẨẪÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ"
 
-    # 📝 Các ký tự đặc biệt thường gặp trong toán học/ký hiệu có thể bị lỗi OCR
     # Cần loại bỏ hoặc thay thế nếu không phải là phần của văn bản thông thường.
     # Ví dụ: toán tử, ký hiệu tiền tệ, các ký tự không in được, v.v.
     # Lưu ý: Cẩn thận không xóa các dấu câu hợp lệ.
@@ -28,7 +27,7 @@ class TextProcessor:
         r"[^\w\s" + VIETNAMESE_CHARS + r".,;:!?()\"\'\-\/—\$%\&\*\+=<>@#^`~\[\]{}|\\_]"  # Các ký tự còn lại
     )
 
-    # ⚙️ Sửa lỗi thay thế ký tự phổ biến của OCR (thường là lẫn giữa chữ và số)
+    #Sửa lỗi thay thế ký tự phổ biến của OCR (thường là lẫn giữa chữ và số)
     OCR_CORRECTIONS: Dict[str, str] = {
         '0': 'o', 'O': '0', 'o': '0',  # '0' có thể thành 'o', 'O' có thể thành '0'
         '1': 'l', 'l': '1', 'I': '1',  # 1, l, I lẫn lộn
@@ -49,27 +48,18 @@ class TextProcessor:
         'd': 'đ',  # Sửa chữa ngược lại (cần cẩn thận với từ có 'd')
     }
 
-    # 🧠 Các mẫu sửa lỗi dựa trên ngữ cảnh
-    # Ví dụ: Số ở giữa từ phải là chữ cái.
     CONTEXT_PATTERNS: List[Tuple[Pattern, str]] = [
-        # Số 0 trong từ (chuyển thành 'o' hoặc 'O')
-        (re.compile(r'\b(\w*)0(\w+)\b', re.IGNORECASE), r'\1o\2'),  # w0rd -> word
+        (re.compile(r'\b(\w*)0(\w+)\b', re.IGNORECASE), r'\1o\2'),
         (re.compile(r'\b(\w+)0(\w*)\b', re.IGNORECASE), r'\1o\2'),
-        # Số 1 trong từ (chuyển thành 'l' hoặc 'L' hoặc 'i'/'I')
-        # Thường '1' thành 'l'
-        (re.compile(r'\b(\w*)1(\w+)\b', re.IGNORECASE), r'\1l\2'),  # he11o -> hello
+        (re.compile(r'\b(\w*)1(\w+)\b', re.IGNORECASE), r'\1l\2'),
         (re.compile(r'\b(\w+)1(\w*)\b', re.IGNORECASE), r'\1l\2'),
-        # Số 5 trong từ (chuyển thành 's' hoặc 'S')
-        (re.compile(r'\b(\w*)5(\w+)\b', re.IGNORECASE), r'\1s\2'),  # te5t -> test
+        (re.compile(r'\b(\w*)5(\w+)\b', re.IGNORECASE), r'\1s\2'),
         (re.compile(r'\b(\w+)5(\w*)\b', re.IGNORECASE), r'\1s\2'),
-        # Lỗi 'cl' thành 'd'
         (re.compile(r'cl', re.IGNORECASE), r'd'),
     ]
 
     def __init__(self, language: str = 'vi'):
         self.language = language
-        # self.spell_checker = SpellChecker(language=language) if language == 'en' else None
-        # Giả định không dùng spellchecker mặc định cho tiếng Việt
 
     @staticmethod
     def normalize_unicode(text: str) -> str:
@@ -116,26 +106,7 @@ class TextProcessor:
 
         return text
 
-    # Hàm spell_check trong cấu trúc cũ không phù hợp với tiếng Việt,
-    # nên tôi sẽ giữ lại nó như một 'placeholder' nhưng không gọi trong process()
-    # trừ khi bạn có một cơ chế spell check tiếng Việt riêng.
-    def spell_check(self, text: str) -> str:
-        """
-        [CHÚ Ý] Hàm này cần thư viện/từ điển tiếng Việt để hoạt động hiệu quả.
-        Tôi đã loại bỏ logic spellchecker dựa trên `spellchecker` (vì nó không phải cho tiếng Việt).
-        Giữ lại hàm này như một placeholder nếu bạn muốn tích hợp sau.
-        """
-        return text  # Trả về nguyên văn nếu không có cơ chế spell check tiếng Việt
-
-    def process(self, text: str, apply_spell_check: bool = False) -> str:
-        """
-        Pipeline xử lý text hoàn chỉnh
-        1. Chuẩn hóa Unicode
-        2. Chuẩn hóa khoảng trắng
-        3. Áp dụng quy tắc sửa lỗi OCR
-        4. Loại bỏ ký tự lạ, toán học, và không hợp lệ
-        5. Kiểm tra chính tả (tùy chọn)
-        """
+    def process(self, text: str) -> str:
         # 1. Chuẩn hóa Unicode
         text = self.normalize_unicode(text)
 
@@ -148,18 +119,12 @@ class TextProcessor:
         # 4. Loại bỏ ký tự lạ, toán học và không hợp lệ
         text = self.clean_math_and_junk_chars(text)
 
-        # 5. Kiểm tra chính tả (chỉ chạy nếu được yêu cầu và có cơ chế hỗ trợ)
-        if apply_spell_check:
-            # Cần thay thế bằng một cơ chế spell check tiếng Việt thực tế
-            text = self.spell_check(text)
-
         # Chuẩn hóa khoảng trắng lần cuối
         text = self.normalize_whitespace(text)
 
         return text
 
 
-# --- Ví dụ sử dụng ---
 
 if __name__ == '__main__':
     # Đầu vào giả định từ OCR
@@ -197,7 +162,7 @@ Tây
     print(ocr_text_input)
 
     # Xử lý text
-    processed_text = processor.process(ocr_text_input, apply_spell_check=True)
+    processed_text = processor.process(ocr_text_input)
 
     print("\n--- 🌟 Text Đã Xử Lý (Loại bỏ lỗi OCR, Toán học, Ký tự lạ) ---")
     print(processed_text)
