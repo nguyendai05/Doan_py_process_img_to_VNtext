@@ -1,6 +1,5 @@
 import re
-from typing import Dict
-
+from typing import Dict, List, Pattern, Tuple, Optional
 import unicodedata
 from spellchecker import SpellChecker
 
@@ -14,9 +13,14 @@ class TextProcessor:
     """
 
     VIETNAMESE_CHARS = r"a-zàáạảãăằắặẳẵâầấậẩẫèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđA-ZÀÁẠẢÃĂẰẮẶẲẴÂẦẤẬẨẪÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ"
-    # Common OCR character substitution errors
+
+    MATH_AND_JUNK_CHARS = re.compile(
+        r"[^\w\s" + VIETNAMESE_CHARS + r".,;:!?()\"\'\-\/—\$%\&\*\+=<>@#^`~\[\]{}|\\_]"  # Các ký tự còn lại
+    )
+
+    # Sửa lỗi thay thế ký tự phổ biến của OCR (thường là lẫn giữa chữ và số)
     OCR_CORRECTIONS: Dict[str, str] = {
-        '0': 'o', 'O': '0',  # '0' có thể thành 'o', 'O' có thể thành '0'
+        '0': 'o', 'O': '0', 'o': '0',  # '0' có thể thành 'o', 'O' có thể thành '0'
         '1': 'l', 'l': '1', 'I': '1',  # 1, l, I lẫn lộn
         '5': 's', 'S': '5',
         '8': 'B', 'B': '8',
@@ -36,22 +40,18 @@ class TextProcessor:
     }
 
     # Context-aware patterns for correction
-    CONTEXT_PATTERNS = [
-        # Numbers in words should be letters
-        (r'\b(\w*)0(\w+)\b', r'\1o\2'),  # w0rd -> word
-        (r'\b(\w+)0(\w*)\b', r'\1o\2'),
-        (r'\b(\w*)1(\w+)\b', r'\1l\2'),  # he11o -> hello
-        (r'\b(\w+)1(\w*)\b', r'\1l\2'),
-        (r'\b(\w*)5(\w+)\b', r'\1s\2'),  # te5t -> test
-        (r'\b(\w+)5(\w*)\b', r'\1s\2'),
+    CONTEXT_PATTERNS: List[Tuple[Pattern, str]] = [
+        (re.compile(r'\b(\w*)0(\w+)\b', re.IGNORECASE), r'\1o\2'),
+        (re.compile(r'\b(\w+)0(\w*)\b', re.IGNORECASE), r'\1o\2'),
+        (re.compile(r'\b(\w*)1(\w+)\b', re.IGNORECASE), r'\1l\2'),
+        (re.compile(r'\b(\w+)1(\w*)\b', re.IGNORECASE), r'\1l\2'),
+        (re.compile(r'\b(\w*)5(\w+)\b', re.IGNORECASE), r'\1s\2'),
+        (re.compile(r'\b(\w+)5(\w*)\b', re.IGNORECASE), r'\1s\2'),
+        (re.compile(r'cl', re.IGNORECASE), r'd'),
     ]
 
     def __init__(self, language: str = 'vi'):
         self.language = language
-        if language == 'vi':
-            self.spell_checker = None
-        else:
-            self.spell_checker = SpellChecker(language=language)
 
     @staticmethod
     def normalize_unicode(text):
@@ -76,61 +76,40 @@ class TextProcessor:
         return text.strip()
 
     def apply_ocr_rules(self, text):
-        """Apply rule-based OCR error corrections"""
-        # Apply context-aware patterns
+        # 1. Áp dụng các mẫu sửa lỗi theo ngữ cảnh (ví dụ: số trong từ)
         for pattern, replacement in self.CONTEXT_PATTERNS:
-            text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+            text = pattern.sub(replacement, text)
 
-        # Fix common multi-character errors
-        text = text.replace('rn', 'm')  # Often misread
-        text = text.replace('vv', 'w')
-        text = text.replace('cl', 'd')
+        # 2. Sửa lỗi thay thế ký tự phổ biến (thường là lẫn giữa chữ và số)
+        # Sẽ sửa từng ký tự/cụm ký tự một.
+        for old, new in self.OCR_CORRECTIONS.items():
+            text = text.replace(old, new)
 
         return text
 
-    def spell_check(self, text):
-        if self.spell_checker is None:
-            return text
+    def clean_math_and_junk_chars(self, text: str) -> str:
+        """Loại bỏ các ký tự lạ, ký tự toán học, hoặc không hợp lệ"""
 
-        words = text.split()
-        corrected_words = []
+        # Loại bỏ các ký tự không nằm trong danh sách VIETNAMESE_CHARS, số,
+        # khoảng trắng, và các dấu câu cơ bản.
+        text = self.MATH_AND_JUNK_CHARS.sub('', text)
 
-        for word in words:
-            # Skip if word contains numbers or special chars
-            if not word.isalpha():
-                corrected_words.append(word)
-                continue
+        return text
 
-            # Check if word is misspelled
-            if word.lower() not in self.spell_checker:
-                correction = self.spell_checker.correction(word.lower())
-                if correction and correction != word.lower():
-                    # Preserve original case
-                    if word.isupper():
-                        correction = correction.upper()
-                    elif word[0].isupper():
-                        correction = correction.capitalize()
-                    corrected_words.append(correction)
-                else:
-                    corrected_words.append(word)
-            else:
-                corrected_words.append(word)
-
-        return ' '.join(corrected_words)
-
-    def process(self, text, apply_spell_check=True):
-        """
-        Full text processing pipeline
-        1. Normalize Unicode
-        2. Normalize whitespace
-        3. Apply OCR rules
-        4. Spell check (optional)
-        """
+    def process(self, text):
+        # 1. Chuẩn hóa Unicode
         text = self.normalize_unicode(text)
+
+        # 2. Chuẩn hóa khoảng trắng
         text = self.normalize_whitespace(text)
+
+        # 3. Áp dụng quy tắc sửa lỗi OCR
         text = self.apply_ocr_rules(text)
 
-        if apply_spell_check and self.language == 'vi':
-            text = self.spell_check(text)
+        # 4. Loại bỏ ký tự lạ, toán học và không hợp lệ
+        text = self.clean_math_and_junk_chars(text)
+
+        # Chuẩn hóa khoảng trắng lần cuối
+        text = self.normalize_whitespace(text)
 
         return text
