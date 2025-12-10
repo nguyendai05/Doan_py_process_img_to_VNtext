@@ -25,7 +25,7 @@ class TTSService:
         Returns: path to generated audio file
         """
         if language not in TTSService.SUPPORTED_LANGUAGES:
-            language = 'en'
+            language = 'vi'
 
         # Generate unique filename
         filename = f"tts_{uuid.uuid4().hex}.mp3"

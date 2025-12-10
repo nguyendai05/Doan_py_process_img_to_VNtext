@@ -291,7 +291,7 @@ async function processOCR() {
             });
             const result = await res.json();
             if (result.success) {
-                addTextBlock(result.processed_text, state.selectedFiles[0].name);
+                addTextBlock(result.bart_output, state.selectedFiles[0].name);
             } else {
                 alert(result.error || 'OCR thất bại');
             }
@@ -309,7 +309,7 @@ async function processOCR() {
             if (result.success) {
                 result.results.forEach(r => {
                     if (r.success) {
-                        addTextBlock(r.processed_text, r.filename);
+                        addTextBlock(r.bart_output, r.filename);
                     }
                 });
             } else {
