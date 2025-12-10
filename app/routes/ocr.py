@@ -4,6 +4,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.services.ocr_service import OCRService
 from app.services.text_processing import TextProcessor
+from app.services.model_inference import run_bart_model
 
 ocr_bp = Blueprint('ocr', __name__)
 
@@ -49,10 +50,13 @@ def single_image_ocr():
         processor = TextProcessor(language='vi')
         processed_text = processor.process(raw_text)
 
+        bart_output = run_bart_model(processed_text)
+
         return jsonify({
             'success': True,
             'raw_text': raw_text,
             'processed_text': processed_text,
+            'bart_output': bart_output,
             'segments': segments
         })
 

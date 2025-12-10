@@ -1,3 +1,4 @@
+transformers
 --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Flask & Extensions
@@ -39,3 +40,5 @@ googletrans==4.0.2
 # Utilities
 python-dotenv==1.0.0
 Werkzeug==3.0.1
+
+sentencepiece

@@ -1,4 +1,6 @@
 import re
+from typing import Dict
+
 import unicodedata
 from spellchecker import SpellChecker
 
@@ -11,18 +13,26 @@ class TextProcessor:
     - Spell checking
     """
 
+    VIETNAMESE_CHARS = r"a-zàáạảãăằắặẳẵâầấậẩẫèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđA-ZÀÁẠẢÃĂẰẮẶẲẴÂẦẤẬẨẪÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ"
     # Common OCR character substitution errors
-    OCR_CORRECTIONS = {
-        '0': 'o', 'O': '0',
-        '1': 'l', 'l': '1', 'I': '1',
+    OCR_CORRECTIONS: Dict[str, str] = {
+        '0': 'o', 'O': '0',  # '0' có thể thành 'o', 'O' có thể thành '0'
+        '1': 'l', 'l': '1', 'I': '1',  # 1, l, I lẫn lộn
         '5': 's', 'S': '5',
         '8': 'B', 'B': '8',
-        '6': 'G', 'G': '6',
-        '2': 'Z', 'Z': '2',
-        '|': 'l',
-        'rn': 'm',
-        'vv': 'w',
+        '|': 'l',  # Dấu gạch đứng (|) thành 'l'
+        'm': 'rn', 'rn': 'm',  # Lỗi 'rn' thành 'm' và ngược lại (ít phổ biến hơn)
+        'vv': 'w',  # Tiếng Việt không có 'w' (thay bằng 'v' hoặc xóa nếu sai)
         'cl': 'd',
+        'é': 'e',  # Lỗi nhận dạng dấu có thể gây ra ký tự lạ
+        'è': 'e',
+        'ç': 'c',
+        # Thêm các ký tự lỗi toán học thường gặp bị nhận dạng sai thành chữ:
+        '°': 'o',  # Ký hiệu độ có thể thành 'o'
+        '£': 'E',  # Ký hiệu bảng Anh có thể thành 'E'
+        # Thêm các lỗi OCR Tiếng Việt cụ thể:
+        'đ': 'a',  # Đôi khi 'đ' bị nhận dạng sai thành 'a' hoặc 'd'
+        'd': 'đ',  # Sửa chữa ngược lại (cần cẩn thận với từ có 'd')
     }
 
     # Context-aware patterns for correction
@@ -36,9 +46,12 @@ class TextProcessor:
         (r'\b(\w+)5(\w*)\b', r'\1s\2'),
     ]
 
-    def __init__(self, language='en'):
+    def __init__(self, language: str = 'vi'):
         self.language = language
-        self.spell_checker = SpellChecker(language=language) if language == 'en' else None
+        if language == 'vi':
+            self.spell_checker = None
+        else:
+            self.spell_checker = SpellChecker(language=language)
 
     @staticmethod
     def normalize_unicode(text):
@@ -76,7 +89,6 @@ class TextProcessor:
         return text
 
     def spell_check(self, text):
-        """Apply spell checking (English only for now)"""
         if self.spell_checker is None:
             return text
 
@@ -118,7 +130,7 @@ class TextProcessor:
         text = self.normalize_whitespace(text)
         text = self.apply_ocr_rules(text)
 
-        if apply_spell_check and self.language == 'en':
+        if apply_spell_check and self.language == 'vi':
             text = self.spell_check(text)
 
         return text
