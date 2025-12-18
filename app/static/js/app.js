@@ -1,6 +1,5 @@
 // State
 const state = {
-    mode: 'single', // single or multi
     user: null,
     selectedFiles: [],
     textBlocks: [],
@@ -28,7 +27,6 @@ const elements = {
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initUpload();
-    initModeSwitch();
     initTools();
     loadWorks();
 });
@@ -212,10 +210,9 @@ function initUpload() {
 }
 
 function handleFiles(files) {
-    const maxFiles = state.mode === 'single' ? 1 : 5;
     const validFiles = Array.from(files)
         .filter(f => ['image/jpeg', 'image/png', 'image/jpg'].includes(f.type))
-        .slice(0, maxFiles);
+        .slice(0, 1);
 
     if (validFiles.length === 0) {
         alert('Vui lòng chọn file ảnh hợp lệ (JPG, PNG)');
@@ -251,22 +248,6 @@ function removeFile(idx) {
     }
 }
 
-// Mode Switch
-function initModeSwitch() {
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.mode = btn.dataset.mode;
-            elements.fileInput.multiple = state.mode === 'multi';
-            // Clear current selection
-            state.selectedFiles = [];
-            elements.previewSection.classList.add('hidden');
-            elements.processBtn.disabled = true;
-        });
-    });
-}
-
 // OCR Processing
 async function processOCR() {
     if (!state.user) {
@@ -281,43 +262,21 @@ async function processOCR() {
     elements.processBtn.textContent = '⏳ Đang xử lý...';
 
     const formData = new FormData();
-
-    if (state.mode === 'single') {
-        formData.append('image', state.selectedFiles[0]);
-        try {
-            const res = await fetch('/api/ocr/single', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await res.json();
-            if (result.success) {
-                addTextBlock(result.bart_output, state.selectedFiles[0].name);
-            } else {
-                alert(result.error || 'OCR thất bại');
-            }
-        } catch (e) {
-            alert('Lỗi kết nối');
+    formData.append('image', state.selectedFiles[0]);
+    
+    try {
+        const res = await fetch('/api/ocr/single', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+        if (result.success) {
+            addTextBlock(result.bart_output, state.selectedFiles[0].name);
+        } else {
+            alert(result.error || 'OCR thất bại');
         }
-    } else {
-        state.selectedFiles.forEach(f => formData.append('images', f));
-        try {
-            const res = await fetch('/api/ocr/multi', {
-                method: 'POST',
-                body: formData
-            });
-            const result = await res.json();
-            if (result.success) {
-                result.results.forEach(r => {
-                    if (r.success) {
-                        addTextBlock(r.bart_output, r.filename);
-                    }
-                });
-            } else {
-                alert(result.error || 'OCR thất bại');
-            }
-        } catch (e) {
-            alert('Lỗi kết nối');
-        }
+    } catch (e) {
+        alert('Lỗi kết nối');
     }
 
     elements.processBtn.disabled = false;
@@ -346,10 +305,22 @@ function renderTextBlocks() {
                     <button class="btn btn-secondary btn-sm" onclick="removeBlock(${block.id})">🗑️</button>
                 </div>
             </div>
-            <div class="text-block-content" data-id="${block.id}" onmouseup="handleTextSelect()">${block.text}</div>
+            <textarea 
+                class="text-block-content editable" 
+                data-id="${block.id}" 
+                onmouseup="handleTextSelect()"
+                oninput="updateBlockText(${block.id}, this.value)"
+            >${block.text}</textarea>
         `;
         elements.textBlocks.appendChild(div);
     });
+}
+
+function updateBlockText(id, newText) {
+    const block = state.textBlocks.find(b => b.id === id);
+    if (block) {
+        block.text = newText;
+    }
 }
 
 function copyText(id) {
