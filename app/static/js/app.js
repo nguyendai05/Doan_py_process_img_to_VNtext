@@ -1,7 +1,9 @@
 // State
 const state = {
+    mode: 'single', // single or multi
     user: null,
     selectedFiles: [],
+    originalImages: [], // THÊM: Lưu ảnh gốc để gửi cho Gemini
     textBlocks: [],
     selectedText: '',
     works: []
@@ -27,6 +29,7 @@ const elements = {
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initUpload();
+    initModeSwitch();
     initTools();
     loadWorks();
 });
@@ -210,9 +213,10 @@ function initUpload() {
 }
 
 function handleFiles(files) {
+    const maxFiles = state.mode === 'single' ? 1 : 5;
     const validFiles = Array.from(files)
         .filter(f => ['image/jpeg', 'image/png', 'image/jpg'].includes(f.type))
-        .slice(0, 1);
+        .slice(0, maxFiles);
 
     if (validFiles.length === 0) {
         alert('Vui lòng chọn file ảnh hợp lệ (JPG, PNG)');
@@ -220,6 +224,7 @@ function handleFiles(files) {
     }
 
     state.selectedFiles = validFiles;
+    state.originalImages = validFiles; // LƯU ẢNH GỐC
     renderPreview();
     elements.processBtn.disabled = false;
 }
@@ -248,6 +253,22 @@ function removeFile(idx) {
     }
 }
 
+// Mode Switch
+function initModeSwitch() {
+    document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.mode = btn.dataset.mode;
+            elements.fileInput.multiple = state.mode === 'multi';
+            // Clear current selection
+            state.selectedFiles = [];
+            elements.previewSection.classList.add('hidden');
+            elements.processBtn.disabled = true;
+        });
+    });
+}
+
 // OCR Processing
 async function processOCR() {
     if (!state.user) {
@@ -262,39 +283,74 @@ async function processOCR() {
     elements.processBtn.textContent = '⏳ Đang xử lý...';
 
     const formData = new FormData();
-    formData.append('image', state.selectedFiles[0]);
-    
-    try {
-        const res = await fetch('/api/ocr/single', {
-            method: 'POST',
-            body: formData
-        });
-        const result = await res.json();
-        if (result.success) {
-            addTextBlock(result.bart_output, state.selectedFiles[0].name);
-        } else {
-            alert(result.error || 'OCR thất bại');
+
+    if (state.mode === 'single') {
+        formData.append('image', state.selectedFiles[0]);
+        try {
+            const res = await fetch('/api/ocr/single', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (result.success) {
+                addTextBlock(result.processed_text, state.selectedFiles[0].name, state.selectedFiles[0]); // TRUYỀN FILE
+            } else {
+                alert(result.error || 'OCR thất bại');
+            }
+        } catch (e) {
+            alert('Lỗi kết nối');
         }
-    } catch (e) {
-        alert('Lỗi kết nối');
+    } else {
+        state.selectedFiles.forEach(f => formData.append('images', f));
+        try {
+            const res = await fetch('/api/ocr/multi', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await res.json();
+            if (result.success) {
+                result.results.forEach((r, idx) => {
+                    if (r.success) {
+                        addTextBlock(r.processed_text, r.filename, state.selectedFiles[idx]); // TRUYỀN FILE
+                    }
+                });
+            } else {
+                alert(result.error || 'OCR thất bại');
+            }
+        } catch (e) {
+            alert('Lỗi kết nối');
+        }
     }
 
     elements.processBtn.disabled = false;
     elements.processBtn.textContent = '🚀 Xử lý OCR';
 }
 
+
 // Text Blocks
-function addTextBlock(text, title = 'Untitled') {
+function addTextBlock(text, title, imageFile) {
     const id = Date.now();
-    state.textBlocks.push({ id, text, title });
+    state.textBlocks.push({
+        id,
+        text,
+        title,
+        imageFile: imageFile || null  // Lưu file ảnh gốc
+    });
     renderTextBlocks();
 }
+
 
 function renderTextBlocks() {
     elements.textBlocks.innerHTML = '';
     state.textBlocks.forEach(block => {
         const div = document.createElement('div');
         div.className = 'text-block';
+
+        // Hiển thị nút summarize nếu có ảnh
+        const summarizeBtn = block.imageFile
+            ? `<button class="btn btn-secondary btn-sm" onclick="summarizeImage(${block.id})">🤖 Tóm tắt AI</button>`
+            : '';
+
         div.innerHTML = `
             <div class="text-block-header">
                 <span class="text-block-title">📄 ${block.title}</span>
@@ -302,26 +358,16 @@ function renderTextBlocks() {
                     <button class="btn btn-secondary btn-sm" onclick="copyText(${block.id})">📋 Copy</button>
                     <button class="btn btn-secondary btn-sm" onclick="saveToWork(${block.id})">💾 Save</button>
                     <button class="btn btn-secondary btn-sm" onclick="downloadText(${block.id})">⬇️ Download</button>
+                    ${summarizeBtn}
                     <button class="btn btn-secondary btn-sm" onclick="removeBlock(${block.id})">🗑️</button>
                 </div>
             </div>
-            <textarea 
-                class="text-block-content editable" 
-                data-id="${block.id}" 
-                onmouseup="handleTextSelect()"
-                oninput="updateBlockText(${block.id}, this.value)"
-            >${block.text}</textarea>
+            <div class="text-block-content" data-id="${block.id}" onmouseup="handleTextSelect()">${block.text}</div>
         `;
         elements.textBlocks.appendChild(div);
     });
 }
 
-function updateBlockText(id, newText) {
-    const block = state.textBlocks.find(b => b.id === id);
-    if (block) {
-        block.text = newText;
-    }
-}
 
 function copyText(id) {
     const block = state.textBlocks.find(b => b.id === id);
@@ -559,3 +605,89 @@ async function loadWork(id) {
 elements.modalOverlay.addEventListener('click', (e) => {
     if (e.target === elements.modalOverlay) closeModal();
 });
+
+async function summarizeImage(blockId) {
+    const block = state.textBlocks.find(b => b.id === blockId);
+
+    if (!block || !block.imageFile) {
+        alert('Không tìm thấy ảnh để tóm tắt');
+        return;
+    }
+
+    // Hiển thị loading modal
+    showLoadingModal('Đang phân tích ảnh bằng Gemini AI...');
+
+    try {
+        const formData = new FormData();
+        formData.append('image', block.imageFile);
+
+        const res = await fetch('/api/tools/summarize-image', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            showSummaryModal(block.title, result.summary, block.imageFile);
+        } else {
+            alert(result.error || 'Lỗi khi tóm tắt ảnh');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối: ' + e.message);
+    }
+}
+
+function showLoadingModal(message) {
+    elements.modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3>⏳ Đang xử lý...</h3>
+        </div>
+        <div style="padding: 2rem; text-align: center;">
+            <p>${message}</p>
+            <div class="loading-spinner"></div>
+        </div>
+    `;
+    elements.modalOverlay.classList.remove('hidden');
+}
+
+function showSummaryModal(title, summary, imageFile) {
+    const imageUrl = URL.createObjectURL(imageFile);
+
+    elements.modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3>🤖 Tóm tắt nội dung ảnh</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="summary-content">
+            <div class="summary-image">
+                <img src="${imageUrl}" alt="${title}" style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem;">
+            </div>
+            <div class="summary-text">
+                <h4 style="margin-bottom: 1rem; color: #667eea;">📝 ${title}</h4>
+                <div style="white-space: pre-wrap; line-height: 1.6;">${summary}</div>
+            </div>
+            <div class="summary-actions" style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                <button class="btn btn-primary" onclick="copySummary(\`${summary.replace(/`/g, '\\`')}\`)">📋 Copy tóm tắt</button>
+                <button class="btn btn-secondary" onclick="downloadSummary('${title}', \`${summary.replace(/`/g, '\\`')}\`)">⬇️ Tải xuống</button>
+            </div>
+        </div>
+    `;
+    elements.modalOverlay.classList.remove('hidden');
+}
+
+function copySummary(text) {
+    navigator.clipboard.writeText(text);
+    alert('Đã copy tóm tắt!');
+}
+
+function downloadSummary(title, text) {
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `summary_${title}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
