@@ -348,8 +348,7 @@ function renderTextBlocks() {
 
         // Hiển thị nút summarize nếu có ảnh
         const summarizeBtn = block.imageFile
-            ? `<button class="btn btn-secondary btn-sm" onclick="summarizeImage(${block.id})">🤖 Tóm tắt AI</button>`
-            : '';
+            ? `<button class="btn btn-secondary btn-sm" onclick="summarizeImage(${block.id})">🤖 Tóm tắt AI</button>` : '';
 
         div.innerHTML = `
             <div class="text-block-header">
@@ -360,6 +359,8 @@ function renderTextBlocks() {
                     <button class="btn btn-secondary btn-sm" onclick="downloadText(${block.id})">⬇️ Download</button>
                     ${summarizeBtn}
                     <button class="btn btn-secondary btn-sm" onclick="removeBlock(${block.id})">🗑️</button>
+                    <button class="btn btn-primary btn-sm" onclick="showAdvancedTTS(${block.id})">🎤 Text to mp3</button>
+
                 </div>
             </div>
             <div class="text-block-content" data-id="${block.id}" onmouseup="handleTextSelect()">${block.text}</div>
@@ -691,3 +692,225 @@ function downloadSummary(title, text) {
     URL.revokeObjectURL(url);
 }
 
+// ============ ADVANCED TTS ============
+
+async function showAdvancedTTS(blockId) {
+    const block = state.textBlocks.find(b => b.id === blockId);
+    if (!block) return;
+
+    // Load danh sách giọng nói
+    const voicesRes = await fetch('/api/tools/tts/voices');
+    const voicesData = await voicesRes.json();
+
+    if (!voicesData.success) {
+        alert('Không thể tải danh sách giọng nói');
+        return;
+    }
+
+    const voices = voicesData.voices;
+    const styles = voicesData.styles;
+
+    // Hiển thị modal
+    elements.modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3>🎤 Text to Speech (Natural Reader)</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="tts-config">
+            <div class="form-group">
+                <label>🌍 Ngôn ngữ đích</label>
+                <select id="tts-lang" onchange="updateVoiceOptions()">
+                    ${Object.keys(voices).map(lang => `
+                        <option value="${lang}">${getLanguageName(lang)}</option>
+                    `).join('')}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>👤 Giới tính giọng nói</label>
+                <select id="tts-gender" onchange="updateVoiceList()">
+                    <option value="female">Nữ</option>
+                    <option value="male">Nam</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>🎙️ Chọn giọng nói</label>
+                <select id="tts-voice"></select>
+            </div>
+
+            <div class="form-group">
+                <label>🎭 Phong cách (Style)</label>
+                <select id="tts-style">
+                    ${styles.map(s => `<option value="${s}">${getStyleName(s)}</option>`).join('')}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>⚡ Tốc độ đọc: <span id="rate-value">+0%</span></label>
+                <input type="range" id="tts-rate" min="-50" max="100" value="0"
+                       oninput="document.getElementById('rate-value').textContent = (this.value >= 0 ? '+' : '') + this.value + '%'">
+            </div>
+
+            <div class="form-group">
+                <label>🎵 Cao độ: <span id="pitch-value">+0Hz</span></label>
+                <input type="range" id="tts-pitch" min="-50" max="50" value="0"
+                       oninput="document.getElementById('pitch-value').textContent = (this.value >= 0 ? '+' : '') + this.value + 'Hz'">
+            </div>
+
+            <button class="btn btn-primary" style="width:100%; margin-top: 1rem;"
+                    onclick="generateAdvancedTTS(${blockId})">
+                🎤 Tạo giọng nói
+            </button>
+
+            <div id="tts-result" class="tts-result" style="margin-top: 1.5rem;"></div>
+        </div>
+    `;
+
+    elements.modalOverlay.classList.remove('hidden');
+
+    // Lưu voices data vào state tạm
+    window.ttsVoicesData = voices;
+
+    // Init voice list
+    updateVoiceOptions();
+}
+
+function updateVoiceOptions() {
+    const lang = document.getElementById('tts-lang').value;
+    document.getElementById('tts-gender').value = 'female';
+    updateVoiceList();
+}
+
+function updateVoiceList() {
+    const lang = document.getElementById('tts-lang').value;
+    const gender = document.getElementById('tts-gender').value;
+
+    const voices = window.ttsVoicesData[lang]?.[gender] || [];
+
+    const voiceSelect = document.getElementById('tts-voice');
+    voiceSelect.innerHTML = voices.map((v, idx) => `
+        <option value="${idx}">${v}</option>
+    `).join('');
+}
+
+let lastTTSRequest = 0;
+const TTS_COOLDOWN = 5000; //
+
+async function generateAdvancedTTS(blockId) {
+    const now = Date.now();
+    if (now - lastTTSRequest < TTS_COOLDOWN) {
+        alert(`⏳ Vui lòng đợi ${Math.ceil((TTS_COOLDOWN - (now - lastTTSRequest)) / 1000)}s`);
+        return;
+    }
+    lastTTSRequest = now;
+
+    const block = state.textBlocks.find(b => b.id === blockId);
+    if (!block) return;
+
+    const rateValue = parseInt(document.getElementById('tts-rate').value, 10);
+    const pitchValue = parseInt(document.getElementById('tts-pitch').value, 10);
+
+    const rate = (rateValue >= 0 ? `+${rateValue}%` : `${rateValue}%`);
+    const pitch = (pitchValue >= 0 ? `+${pitchValue}Hz` : `${pitchValue}Hz`);
+
+    const config = {
+        text: block.text,
+        target_lang: document.getElementById('tts-lang').value,
+        voice_gender: document.getElementById('tts-gender').value,
+        voice_index: parseInt(document.getElementById('tts-voice').value, 10),
+        rate,
+        pitch,
+        style: document.getElementById('tts-style').value
+    };
+
+
+    // Show loading
+    document.getElementById('tts-result').innerHTML = `
+        <div style="text-align:center; padding: 2rem;">
+            <div class="loading-spinner"></div>
+            <p>Đang tạo giọng nói...</p>
+        </div>
+    `;
+
+    try {
+        const res = await fetch('/api/tools/advanced-tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            document.getElementById('tts-result').innerHTML = `
+                <div class="tts-success">
+                    <h4 style="color: #10b981; margin-bottom: 1rem;">✅ Tạo thành công!</h4>
+                    <audio controls style="width: 100%; margin-bottom: 1rem;">
+                        <source src="${result.audio_url}" type="audio/mpeg">
+                    </audio>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-primary" onclick="downloadAudio('${result.audio_url}', '${result.filename}')">
+                            ⬇️ Tải xuống MP3
+                        </button>
+                        <button class="btn btn-secondary" onclick="copyAudioLink('${window.location.origin}${result.audio_url}')">
+                            🔗 Copy link
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            document.getElementById('tts-result').innerHTML = `
+                <div style="color: #ef4444; padding: 1rem; background: rgba(239, 68, 68, 0.1); border-radius: 8px;">
+                    ❌ ${result.error}
+                </div>
+            `;
+        }
+    } catch (e) {
+        document.getElementById('tts-result').innerHTML = `
+            <div style="color: #ef4444;">❌ Lỗi: ${e.message}</div>
+        `;
+    }
+}
+
+function downloadAudio(url, filename) {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+}
+
+function copyAudioLink(url) {
+    navigator.clipboard.writeText(url);
+    alert('Đã copy link audio!');
+}
+
+function getLanguageName(code) {
+    const names = {
+        'vi': '🇻🇳 Tiếng Việt',
+        'en': '🇬🇧 English',
+        'ja': '🇯🇵 日本語',
+        'ko': '🇰🇷 한국어',
+        'zh-CN': '🇨🇳 中文',
+        'fr': '🇫🇷 Français',
+        'de': '🇩🇪 Deutsch',
+        'es': '🇪🇸 Español'
+    };
+    return names[code] || code;
+}
+
+function getStyleName(style) {
+    const names = {
+        'general': 'Bình thường',
+        'cheerful': 'Vui vẻ',
+        'sad': 'Buồn',
+        'angry': 'Giận dữ',
+        'terrified': 'Sợ hãi',
+        'shouting': 'Hét',
+        'whispering': 'Thì thầm',
+        'newscast': 'Đọc tin',
+        'customer-service': 'Chăm sóc khách hàng',
+        'assistant': 'Trợ lý'
+    };
+    return names[style] || style;
+}

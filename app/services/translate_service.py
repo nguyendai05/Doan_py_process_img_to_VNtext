@@ -1,59 +1,22 @@
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 
 
 class TranslateService:
-    """Translation service using Google Translate"""
+    """Translation service using Google Translate (via deep-translator)"""
 
-    SUPPORTED_LANGUAGES = {
-        'en': 'English',
-        'vi': 'Vietnamese',
-        'fr': 'French',
-        'de': 'German',
-        'es': 'Spanish',
-        'ja': 'Japanese',
-        'ko': 'Korean',
-        'zh-cn': 'Chinese (Simplified)',
-        'zh-tw': 'Chinese (Traditional)',
-        'th': 'Thai',
-        'ru': 'Russian',
-    }
-
-    def __init__(self):
-        self.translator = Translator()
-
-    def translate(self, text, dest_lang, src_lang='auto'):
-        """
-        Translate text to target language
-        Args:
-            text: Text to translate
-            dest_lang: Target language code
-            src_lang: Source language code (auto-detect if 'auto')
-        Returns:
-            dict with translated text and detected source language
-        """
+    @staticmethod
+    def translate(text, dest_lang='en', src_lang='auto'):
+        """Translate text to target language"""
         try:
-            result = self.translator.translate(text, dest=dest_lang, src=src_lang)
+            result = GoogleTranslator(source=src_lang, target=dest_lang).translate(text)
+
             return {
                 'success': True,
-                'translated_text': result.text,
-                'source_lang': result.src,
+                'translated_text': result,
+                'src_lang': src_lang,
                 'dest_lang': dest_lang
             }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
 
-    def detect_language(self, text):
-        """Detect language of text"""
-        try:
-            detection = self.translator.detect(text)
-            return {
-                'success': True,
-                'language': detection.lang,
-                'confidence': detection.confidence
-            }
         except Exception as e:
             return {
                 'success': False,
@@ -63,4 +26,17 @@ class TranslateService:
     @staticmethod
     def get_supported_languages():
         """Get list of supported languages"""
-        return TranslateService.SUPPORTED_LANGUAGES
+        return {
+            'en': 'English',
+            'vi': 'Tiếng Việt',
+            'ja': '日本語',
+            'ko': '한국어',
+            'zh-CN': '中文',
+            'fr': 'Français',
+            'de': 'Deutsch',
+            'es': 'Español',
+            'ru': 'Русский',
+            'th': 'ไทย',
+            'ar': 'العربية',
+            'hi': 'हिन्दी'
+        }
