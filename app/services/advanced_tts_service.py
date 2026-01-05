@@ -4,13 +4,6 @@ from gtts import gTTS
 
 
 class AdvancedTTSService:
-    """
-    gTTS-only TTS.
-    - Không có male/female thật
-    - "voices" là accent (tld) / biến thể cấu hình để tạo cảm giác khác
-    - Cache mp3 theo (text + lang + tld)
-    """
-
     # map key bạn dùng ở frontend -> gTTS lang
     LANG_MAP = {
         "vi": "vi",
@@ -28,8 +21,6 @@ class AdvancedTTSService:
         "hi": "hi",
     }
 
-    # "voice variants" theo tld (accent). Ghi chú: gTTS không đảm bảo mọi lang đều khác rõ.
-    # en: thường khác rõ nhất
     VOICE_TLDS = {
         "en": ["com", "co.uk", "com.au", "ca"],   # US, UK, AU, CA
         "fr": ["fr", "ca", "com", "co.uk"],
@@ -64,7 +55,6 @@ class AdvancedTTSService:
         def build_for_lang(lang_key: str):
             gtts_lang = cls.LANG_MAP.get(lang_key, "vi")
             tlvs = cls.VOICE_TLDS.get(gtts_lang, ["com"])
-            # giả lập 2 nữ 2 nam bằng cách chia list tld (không phải gender thật)
             females = tlvs[:2]
             males = tlvs[2:4] if len(tlvs) > 2 else tlvs[:2]
             return {"female": females, "male": males}

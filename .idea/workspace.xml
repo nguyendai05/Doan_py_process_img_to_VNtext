@@ -5,29 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="89bcf36d-7299-4828-b0e6-7cdecb9b05d6" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/Doan_py_process_img_to_VNtext.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Doan_py_process_img_to_VNtext.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/routes/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/tools.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/services/advanced_tts_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/advanced_tts_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/services/gemini_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/gemini_service.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_29a2632afbc4f7fb7981b843dedc067c.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_2afb8e8ed8e2302da3f035eb1b04bd11.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_2ff8911a9256269c7502aedbc9b75eab.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_35da299f62af36a0134addaae987fcfd.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_745691fea3329fc0e3292a4b735da736.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_95650a32059e8869f7eacfa4901e1b8c.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_a174ec2699fc4b661a87751d250a00e1.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_a6ab869e5cffec03eab4acbfc8072aad.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_b2a9c3dff95f9baa522a864736208550.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_c6ce29e92c1ed685c73ddd1cd96b68ca.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_d326c8896d67dd208147208a11995006.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_fdc38e0183dcf23aef14c6bda0e32a0f.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/audio/tts_gtts_9cdf35b78ee2d0f14d753f35d56a9241.mp3" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/static/css/style.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/static/js/app.js" beforeDir="false" afterPath="$PROJECT_DIR$/app/static/js/app.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/instance/app.db" beforeDir="false" afterPath="$PROJECT_DIR$/instance/app.db" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/audio/tts_c03e3e44a1354234b14ef6d7865d50ac.mp3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/model_inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/model_inference.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,12 +24,12 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "23130138"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;23130138&quot;
   }
-}]]></component>
+}</component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/nguyendai05/Doan_py_process_img_to_VNtext.git&quot;,
@@ -64,30 +44,30 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.advanced_tts_service.executor": "Run",
-    "Python.run.executor": "Run",
-    "Python.tools.executor": "Run",
-    "Python.translate_service.executor": "Run",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "Huy-van",
-    "ignore.virus.scanning.warn.message": "true",
-    "junie.onboarding.icon.badge.shown": "true",
-    "last_opened_file_path": "D:/PyCharm/Doan_py_img-to-text/Doan_py_process_img_to_VNtext",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "to.speed.mode.migration.done": "true",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.advanced_tts_service.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run.executor&quot;: &quot;Run&quot;,
+    &quot;Python.tools.executor&quot;: &quot;Run&quot;,
+    &quot;Python.translate_service.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Huy-van&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/PyCharm/Doan_py_img-to-text/Doan_py_process_img_to_VNtext&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager">
     <configuration name="run" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Doan_py_process_img_to_VNtext" />
