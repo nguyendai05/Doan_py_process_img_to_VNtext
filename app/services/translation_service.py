@@ -1,360 +1,379 @@
-# app/services/translation_service.py
-"""
-Model local: vinai-translate-vi2en-v2
-
-Mục tiêu:
-- Load mBART đúng cách: src_lang + decoder_start_token_id (để ra đúng EN)
-- Chia chunk theo TOKEN budget (tránh truncation/mất chữ)
-- Dịch theo batch (nhanh hơn)
-- Tính toán metadata + invariant-check ngay trong service (không phụ thuộc UI)
-"""
-
 from __future__ import annotations
-
-from pathlib import Path                      # dùng Path để quản lý đường dẫn model local cho rõ ràng
-import logging                               # logging để debug khi deploy server
-import re                                    # regex để tách câu + kiểm invariants
-import threading                             # lock để tránh load model nhiều lần khi server nhiều request
-import time                                  # đo time_ms cho mỗi lần translate
-from typing import Dict, Any, List, Optional, Tuple
-
+from pathlib import Path
+import re
+import threading
+from typing import Dict, Any, List, Optional
 import torch
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-
-logger = logging.getLogger(__name__)          # logger theo module (chuẩn logging Python)
-
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM  # tokenizer + seq2seq model
 
 class TranslationService:
     def __init__(
         self,
-        model_path: str | Path = "D:/translation_models/vinai-translate-vi2en-v2",
+        model_path: str | Path = r"D:\translation_models\vinai-translate-vi2en-v2",  # path model local
         device: Optional[str] = None,
-        max_input_tokens: int = 450,          # budget token input (an toàn < 512 token encoder)
-        max_new_tokens: int = 256,            # giới hạn token output (tránh câu quá dài gây chậm)
-        num_beams: int = 4,                   # beam search: 4 là cân bằng chất lượng/tốc độ
-        batch_size: int = 8,                  # dịch theo batch để nhanh hơn
+        max_input_tokens: int = 450,               # token cho mỗi chunk
+        max_new_tokens: int = 256,                 # giới hạn output token
+        num_beams: int = 4,                        # beam search (cân bằng chất lượng/tốc độ)
+        batch_size: int = 8,                       # dịch theo batch để giảm số lần generate()
+        print_chunks: bool = True,                 # in quá trình chia chunk + cắt theo word
     ):
-        self.model_path = Path(model_path)    # chuyển sang Path để check exists + join path thuận tiện
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")  # auto GPU nếu có
-
-        self.max_input_tokens = max_input_tokens
-        self.max_new_tokens = max_new_tokens
+        self.model_path = Path(model_path)
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.max_input_tokens = max_input_tokens   #  chunk
+        self.max_new_tokens = max_new_tokens       #  generate
         self.num_beams = num_beams
-        self.batch_size = batch_size
+        self.batch_size = batch_size               #  batch
+        self.print_chunks = print_chunks           # bật/tắt in chunk
+        self.tokenizer = None                      # lazy-load tokenizer
+        self.model = None                          # lazy-load model
+        self._decoder_start_token_id = None        # id token để decoder bắt đầu bằng en_XX
+        self._load_lock = threading.Lock()         #synchronized
 
-        self.tokenizer: Optional[AutoTokenizer] = None   # lazy-load tokenizer
-        self.model: Optional[AutoModelForSeq2SeqLM] = None  # lazy-load model
-        self._decoder_start_token_id: Optional[int] = None  # token id để decoder bắt đầu bằng en_XX
+    #  print cho chunk
+    def _chunk_print(self, msg: str) -> None:
+        if self.print_chunks:
+            print(msg, flush=True)
 
-        self._load_lock = threading.Lock()   # lock để thread-safe khi load model (giống synchronized Java)
-
-        logger.info("TranslationService init | device=%s | model_path=%s", self.device, self.model_path)
-
-    # =========================================================
-    # 1) Load model (lazy + thread-safe)
-    # =========================================================
+    # 1) Load model lazy + thread
     def load_model(self) -> None:
-        # Nếu đã load rồi thì bỏ qua (tối ưu thời gian)
-        if self.model is not None and self.tokenizer is not None:
+        if self.model is not None and self.tokenizer is not None:     # đã load rồi thì thôi
             return
-
-        # Dùng lock để tránh 2 request cùng lúc vào, load model 2 lần
-        with self._load_lock:
-            # Double-check sau khi đã acquire lock (pattern chuẩn)
+        with self._load_lock:                                         # chặn current load
             if self.model is not None and self.tokenizer is not None:
                 return
+            if not self.model_path.exists():                          # path fail
+                raise FileNotFoundError(f"Model not found: {self.model_path}")
 
-            # Nếu folder model không tồn tại => báo lỗi rõ ràng cho bạn debug
-            if not self.model_path.exists():
-                raise FileNotFoundError(f"Model not found at: {self.model_path}")
-
-            logger.info("Loading model from: %s", self.model_path)
-
-            # Quan trọng cho mBART: src_lang giúp tokenizer set ngôn ngữ nguồn đúng (vi_VN)
+            # src_lang vi
             self.tokenizer = AutoTokenizer.from_pretrained(
-                str(self.model_path),
+                str(self.model_path),                                  # load từ folder local
                 local_files_only=True,
-                src_lang="vi_VN",
+                src_lang="vi_VN",                                      # set ngôn ngữ nguồn
             )
-
-            # Dùng float16 khi GPU để tăng tốc; CPU thì float32 để ổn định
-            dtype = torch.float16 if self.device == "cuda" else torch.float32
-
-            # Load model từ local (không download)
-            self.model = AutoModelForSeq2SeqLM.from_pretrained(
-                str(self.model_path),
-                local_files_only=True,
-                torch_dtype=dtype,
-            ).to(self.device)
-
-            self.model.eval()  # set inference mode (tương tự disable dropout)
-
-            # Quan trọng cho mBART: decoder_start_token_id = en_XX để output ra tiếng Anh
+            if self.device == "cuda" and not torch.cuda.is_available():
+                self.device = "cpu"
             try:
-                self._decoder_start_token_id = self.tokenizer.lang_code_to_id["en_XX"]
-            except Exception as e:
-                raise ValueError("Missing lang_code_to_id['en_XX'] in tokenizer.") from e
+                dtype = torch.float16 if self.device == "cuda" else torch.float32
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                    str(self.model_path),                              # load từ folder local
+                    local_files_only=True,
+                    torch_dtype=dtype,
+                ).to(self.device)
+            except Exception:
+                # fallback CPU nếu GPU fail
+                self.device = "cpu"
+                self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                    str(self.model_path),
+                    local_files_only=True,
+                    torch_dtype=torch.float32,
+                ).to(self.device)
 
-            logger.info("✓ Model loaded | decoder_start_token_id=%s", self._decoder_start_token_id)
+            self.model.eval()
 
-    # =========================================================
-    # 2) Normalize + sentence split + token count
-    # =========================================================
+            #set decoder start = en_XX để output ra tiếng Anh
+            self._decoder_start_token_id = self.tokenizer.lang_code_to_id["en_XX"]
+
+    # 2) Chuẩn hoá + tách câu + đếm token
     @staticmethod
     def _normalize(text: str) -> str:
-        # Chuẩn hoá: bỏ space đầu/cuối + gom nhiều khoảng trắng => 1 space
-        text = text.strip()
-        text = re.sub(r"\s+", " ", text)
+        text = text.strip()                    # bỏ space đầu/cuối
+        text = re.sub(r"\s+", " ", text)       # gom nhiều whitespace về 1 space
         return text
 
     @staticmethod
     def _split_sentences(text: str) -> List[str]:
-        # Tách câu theo dấu .!? và xuống dòng để chunk theo ngữ nghĩa (ít phá nghĩa)
+        # tách câu theo dấu và xuống dòng
         parts = re.split(r"(?<=[.!?。！？])\s+|\n+", text)
-        return [p.strip() for p in parts if p and p.strip()]
+        return [p.strip() for p in parts if p and p.strip()]  # lọc rỗng + strip từng phần
 
     def _count_tokens(self, text: str) -> int:
-        # Đếm tokens để đảm bảo chunk không vượt budget => tránh truncation
+        # yêu cầu tokenizer đã load
         return len(self.tokenizer.encode(text, add_special_tokens=False))
 
-    # =========================================================
-    # 3) Chunking theo token budget (tránh mất chữ)
-    # =========================================================
+    # 3) Chunk theo token budget tránh mất chữ
     def split_into_chunks(self, text: str) -> List[str]:
-        """
-        Chunk theo câu, nhưng giới hạn theo token budget:
-        - Nếu câu đơn lẻ vượt budget => cắt theo từ.
-        - Nếu ghép thêm câu vượt budget => flush chunk hiện tại.
-        """
-        text = self._normalize(text)
-        if not text:
+        # tokenizerđếm token
+        text = self._normalize(text)           # normalize input trước
+        if not text:                           # input rỗng
             return []
 
-        sentences = self._split_sentences(text)
-        if not sentences:
+        sentences = self._split_sentences(text)  # tách câu
+        if not sentences:                        # nếu không tách được thì coi như 1 chunk
             return [text]
 
-        chunks: List[str] = []
-        current: List[str] = []
+        chunks: List[str] = []                 # list output chunks
+        current: List[str] = []                #  chunk hiện tại
 
-        def flush():
-            # Đẩy chunk hiện tại vào danh sách chunks
+        # in  chia chunk
+        self._chunk_print(f"[chunk] max_input_tokens={self.max_input_tokens} | sentences={len(sentences)}")
+
+        def flush(reason: str = "") -> None:
+            # đẩy current thành 1 chunk and reset
             if current:
-                chunks.append(" ".join(current).strip())
+                out_chunk = " ".join(current).strip()
+                chunks.append(out_chunk)
+                #  in khi flush chunk
+                if reason:
+                    self._chunk_print(f"[chunk] flush -> ({reason}) | tokens={self._count_tokens(out_chunk)} | text={out_chunk}")
+                else:
+                    self._chunk_print(f"[chunk] flush -> tokens={self._count_tokens(out_chunk)} | text={out_chunk}")
                 current.clear()
 
-        for sent in sentences:
-            # 1) Nếu 1 câu quá dài theo token => cắt theo từ
-            if self._count_tokens(sent) > self.max_input_tokens:
-                flush()  # đảm bảo chunk trước đó không bị dính với câu dài
-                words = sent.split()
+        for idx, sent in enumerate(sentences, start=1):
+            sent_tokens = self._count_tokens(sent)
 
-                buf: List[str] = []
+            #in từng câu + token
+            self._chunk_print(f"[chunk] sent {idx}/{len(sentences)} | tokens={sent_tokens} | {sent}")
+
+            # 1 câu > token budget -> cắt theo word kh mất text
+            if sent_tokens > self.max_input_tokens:
+                flush("before split-long-sentence")  #tách riêng, tránh dính với chunk trước
+                self._chunk_print(f"[chunk] long sentence -> split by words | sent_tokens={sent_tokens}")
+
+                words = sent.split()            # tách theo khoảng trắng
+                buf: List[str] = []             # buffer cho đoạn cắt theo word
+
                 for w in words:
-                    cand = (" ".join(buf + [w])).strip()
+                    cand = " ".join(buf + [w]).strip()  # thử thêm 1 từ
                     if self._count_tokens(cand) <= self.max_input_tokens:
-                        buf.append(w)
+                        buf.append(w)           # còn trong budget -> giữ
+                        #  in gọn lúc ghép word
+                        self._chunk_print(f"[chunk-word] + '{w}' | buf_tokens={self._count_tokens(cand)}")
                     else:
                         if buf:
-                            chunks.append(" ".join(buf).strip())
-                        buf = [w]
+                            out_buf = " ".join(buf).strip()
+                            chunks.append(out_buf)  # flush buf thành chunk
+                            # in lúc flush theo word
+                            self._chunk_print(f"[chunk-word] flush -> tokens={self._count_tokens(out_buf)} | text={out_buf}")
+                        buf = [w]               # bắt đầu buf mới với từ hiện tại
+                        self._chunk_print(f"[chunk-word] new buf start with '{w}'")
+
                 if buf:
-                    chunks.append(" ".join(buf).strip())
+                    out_buf = " ".join(buf).strip()
+                    chunks.append(out_buf)  # flush phần còn lại
+                    self._chunk_print(f"[chunk-word] flush(last) -> tokens={self._count_tokens(out_buf)} | text={out_buf}")
                 continue
 
-            # 2) Nếu current rỗng => bắt đầu chunk mới
+            # nếu current rỗng -> bắt đầu chunk mới
             if not current:
                 current.append(sent)
+                self._chunk_print(f"[chunk] start new chunk with sent {idx}")
                 continue
 
-            # 3) Thử ghép câu vào chunk hiện tại (theo token budget)
-            cand = (" ".join(current + [sent])).strip()
-            if self._count_tokens(cand) <= self.max_input_tokens:
-                current.append(sent)
-            else:
-                flush()
-                current.append(sent)
+            # ghép câu vào chunk hiện tại, > budget thì flush rồi create new chucnk
+            cand = " ".join(current + [sent]).strip()
+            cand_tokens = self._count_tokens(cand)
 
-        flush()
+            if cand_tokens <= self.max_input_tokens:
+                current.append(sent)            # còn budget -> ghép luôn
+                self._chunk_print(f"[chunk] append -> chunk_tokens={cand_tokens}")
+            else:
+                flush("budget exceeded")        # (NEW) vượt budget -> chốt chunk cũ
+                current.append(sent)            # mở chunk mới
+                self._chunk_print(f"[chunk] start new chunk (after flush) with sent {idx}")
+
+        flush("end")                              # chốt chunk cuối
         return chunks
 
-    # =========================================================
-    # 4) Invariant check (kiểm “đúng dữ liệu” cho OCR)
-    # =========================================================
+    # 4 giữ nguyên dữ liệu quan trọng
     @staticmethod
     def _extract_invariants(text: str) -> List[str]:
-        """
-        Trích các chuỗi "nên giữ nguyên" trong bản dịch:
-        - URL, email
-        - date/time
-        - numbers/percent
-        - mã phòng/mã dạng A-203, B-12, ...
-        """
         patterns = [
-            r"(https?://[^\s]+|www\.[^\s]+)",                 # URL
-            r"\b[\w.\-+]+@[\w.\-]+\.\w+\b",                   # Email
-            r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",               # yyyy-mm-dd / yyyy/mm/dd
-            r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",             # dd-mm-yyyy / dd/mm/yyyy
-            r"\b\d{1,2}\.\d{1,2}\.\d{2,4}\b",                 # dd.mm.yyyy
-            r"\b\d{1,2}:\d{2}(?::\d{2})?\b",                  # time: HH:MM(:SS)
-            r"\b\d+(?:[.,]\d+)*%?\b",                         # numbers + optional %
-            r"\b[A-Z]{1,3}-\d{1,4}\b",                        # room/code: A-203, B-12, R2-101
+            r"(https?://[^\s]+|www\.[^\s]+)",  # URL
+            r"\b[\w.\-+]+@[\w.\-]+\.\w+\b",  # Email
+            r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b",  # yyyy-mm-dd   <-- THÊM DÒNG NÀY
+            r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",  # dd-mm-yyyy
+            r"\b\d{1,2}:\d{2}(?::\d{2})?\b",  # HH:MM(:SS)
+            r"\b\d+(?:[.,]\d+)*(?:%|\b)",  # numbers + optional %
+            r"\b[A-Z]{1,6}(?:\d{0,3})?(?:-\d{1,6}){1,3}\b",  # codes: A-203, R2-101, HD-2026-001...
         ]
 
         found: List[str] = []
         for p in patterns:
-            found.extend(re.findall(p, text))
+            found.extend(re.findall(p, text))               # gom tất cả match
 
-        # Làm sạch những ký tự dấu câu hay bị dính ở cuối URL/email khi đứng cuối câu
         def clean_item(s: str) -> str:
-            return s.strip().rstrip(".,;:!?)]}\"'")  # remove trailing punctuation often attached by NLP
+            # bỏ dấu câu hay dính ở cuối link/email khi đứng cuối câu
+            return s.strip().rstrip(".,;:!?)]}\"'")
 
         cleaned = [clean_item(x) for x in found if clean_item(x)]
-        # unique + giữ thứ tự tương đối (dùng dict trick)
-        return list(dict.fromkeys(cleaned))
+        return list(dict.fromkeys(cleaned))                 # unique nhưng giữ thứ tự tương đối
 
     @staticmethod
     def _digits_only(s: str) -> str:
-        # Dùng cho numbers: nếu model bỏ dấu phẩy/chấm thì vẫn có thể check bằng digits
-        return re.sub(r"\D", "", s)
+        return re.sub(r"\D", "", s)                         # lấy riêng chữ số để check tolerant
 
     def check_invariants(self, src_text: str, out_text: str) -> Dict[str, Any]:
-        """
-        Kiểm tra các invariant có còn trong output không.
-        - URL/email/date/time: check strict substring
-        - numbers: check strict OR digits-only (tolerant hơn)
-        """
-        inv = self._extract_invariants(src_text)
+        inv = self._extract_invariants(src_text)            # lấy list invariant từ input
+        out_digits = self._digits_only(out_text)            # digits-only của output để check số
 
         missing: List[str] = []
         for item in inv:
-            if item in out_text:
+            if item in out_text:                            # khớp strict substring
                 continue
 
-            # với số: cho phép tồn tại dạng digits-only trong output (giảm false negative)
-            if self._digits_only(item):
-                if self._digits_only(item) and self._digits_only(item) in self._digits_only(out_text):
-                    continue
+            d = self._digits_only(item)                     # nếu là số (có digits)
+            if d and d in out_digits:                       # tolerant: số tồn tại dù mất dấu , .
+                continue
 
-            missing.append(item)
+            missing.append(item)                            # không thấy -> đánh dấu thiếu
 
-        return {
-            "count": len(inv),
-            "missing": missing,
-            "ok": len(missing) == 0,
-        }
+        return {"count": len(inv), "missing": missing, "ok": len(missing) == 0}
 
-    # =========================================================
-    # 5) Translate batch
-    # =========================================================
+
+    # 5) Translate batch (tokenize -> generate -> decode)
     def _translate_batch(self, texts: List[str]) -> List[str]:
         if not texts:
             return []
 
-        # Tokenize batch: padding để cùng shape, truncation safety cho encoder 512
+        # tokenize batch: padding để cùng shape, truncation safety max 512
         enc = self.tokenizer(
             texts,
-            return_tensors="pt",
+            return_tensors="pt",                            # output tensor cho PyTorch
             padding=True,
-            truncation=True,
-            max_length=512,
+            truncation=True,                                # cắt nếu vượt max_length
+            max_length=512,                                 # giới hạn encoder của mBART
         )
-        # Move tensors lên GPU/CPU đúng device
-        enc = {k: v.to(self.device) for k, v in enc.items()}
+        enc = {k: v.to(self.device) for k, v in enc.items()}  # chuyển input lên cpu/cuda
 
-        # inference_mode: nhanh hơn + không giữ graph
         with torch.inference_mode():
             out_ids = self.model.generate(
-                **enc,
-                decoder_start_token_id=self._decoder_start_token_id,  # bắt buộc để ra English
-                num_beams=self.num_beams,                            # beam search
-                early_stopping=True,
-                max_new_tokens=self.max_new_tokens,                  # giới hạn output tokens
+                **enc,                                      # input_ids, .
+                decoder_start_token_id=self._decoder_start_token_id,  # bắt đầu bằng en_XX
+                num_beams=self.num_beams,                   # beam search
+                early_stopping=True,                        # dừng sớm khi xong
+                max_new_tokens=self.max_new_tokens,         # giới hạn output token
             )
 
-        # Decode token ids thành string tiếng Anh
-        outs = self.tokenizer.batch_decode(out_ids, skip_special_tokens=True)
-        return [self._normalize(o) for o in outs]  # normalize output để sạch
-
-    # =========================================================
-    # 6) Public API: translate() trả đủ metadata + invariant report
-    # =========================================================
-    def translate(self, text: str, dest_lang: str = "en", src_lang: str = "vi") -> Dict[str, Any]:
-        start = time.perf_counter()  # bắt đầu đo thời gian (ms) cho toàn bộ request
-        try:
-            # Validate input
-            if not text or not text.strip():
-                return {"success": False, "error": "Empty text"}
-
-            # Model local này chỉ hỗ trợ vi -> en
-            if src_lang != "vi" or dest_lang != "en":
-                return {"success": False, "error": "This local model only supports vi -> en."}
-
-            self.load_model()  # đảm bảo tokenizer/model đã sẵn sàng
-
-            raw = self._normalize(text)  # normalize trước khi chunk
-            chunks = self.split_into_chunks(raw)  # chunk theo token budget để không mất chữ
-
-            if not chunks:
-                return {"success": False, "error": "No valid text"}
-
-            # Translate theo batch để nhanh hơn (ít call generate hơn)
-            translated_chunks: List[str] = []
-            for i in range(0, len(chunks), self.batch_size):
-                batch = chunks[i : i + self.batch_size]
-                translated_chunks.extend(self._translate_batch(batch))
-
-            result = self._normalize(" ".join([t for t in translated_chunks if t]))
-            if not result:
-                return {"success": False, "error": "No translation result"}
-
-            # Kiểm “đúng dữ liệu” (invariants) ngay trong service
-            inv_report = self.check_invariants(raw, result)
-
-            # Nếu thiếu invariant => trả warning (để UI/FE muốn hiển thị thì hiển thị; không bắt buộc)
-            warning = None
-            if not inv_report["ok"]:
-                warning = "Translation may have altered critical data (numbers/dates/urls/emails/codes)."
-
-            time_ms = int((time.perf_counter() - start) * 1000)  # tổng thời gian xử lý tính bằng ms
-
-            return {
-                "success": True,
-                "translated_text": result,
-                "source_lang": "vi",
-                "dest_lang": "en",
-                "device": self.device,             # metadata: CPU/GPU
-                "chunks_count": len(chunks),       # metadata: số chunk
-                "time_ms": time_ms,                # metadata: thời gian chạy
-                "invariants": inv_report,          # report: count/missing/ok
-                "warning": warning,                # warning nếu thiếu dữ liệu quan trọng
-            }
-
-        except Exception as e:
-            logger.error("Translation error: %s", str(e), exc_info=True)
-            time_ms = int((time.perf_counter() - start) * 1000)
-            return {"success": False, "error": f"Translation failed: {str(e)}", "time_ms": time_ms}
-
-    # Debug helper: xem chunk trước khi dịch (phục vụ test/demo)
-    def preview_chunks(self, text: str) -> List[Dict[str, Any]]:
-        self.load_model()                       # cần tokenizer để đếm token
-        raw = self._normalize(text)             # normalize cho ổn định
-        chunks = self.split_into_chunks(raw)    # chunk logic chạy trong service
-
-        return [
-            {
-                "index": i + 1,
-                "chars": len(c),
-                "tokens": self._count_tokens(c),
-                "text": c,
-            }
-            for i, c in enumerate(chunks)
-        ]
-
-    @staticmethod
-    def get_supported_languages() -> Dict[str, str]:
-        return {"vi": "Vietnamese", "en": "English"}
+        outs = self.tokenizer.batch_decode(out_ids, skip_special_tokens=True)  # decode token ids
+        return [self._normalize(o) for o in outs]            # normalize output cho sạch
 
 
-# Singleton instance dùng chung toàn app (tương tự static singleton trong Java)
+    # 6) translate
+    def translate(self, text: str) -> Dict[str, Any]:
+        self.load_model()                                    # đảm bảo model/tokenizer đã load
+
+        raw = self._normalize(text)                           # normalize input
+        if not raw:                                           # rỗng -> trả fail gọn
+            return {"success": False, "error": "Empty text", "time_ms": 0}
+
+        chunks = self.split_into_chunks(raw)                  # chunk theo token budget
+        if not chunks:                                        # không có chunk -> fail
+            return {"success": False, "error": "No valid text", "time_ms": 0}
+
+        translated_chunks: List[str] = []
+        for i in range(0, len(chunks), self.batch_size):      # chia batch
+            batch = chunks[i : i + self.batch_size]           # lấy batch hiện tại
+            translated_chunks.extend(self._translate_batch(batch))  # dịch batch và nối kết quả
+
+        translated_text = self._normalize(" ".join(t for t in translated_chunks if t))  # ghép output
+        invariants = self.check_invariants(raw, translated_text)  # check dữ liệu quan trọng
+
+        return {
+            "success": True,
+            "translated_text": translated_text,
+            "source_lang": "vi",                               # cố định vi->en cho model này
+            "dest_lang": "en",
+            "device": self.device,                             # cpu/cuda
+            "chunks_count": len(chunks),                       # số chunk đã dùng
+            "invariants": invariants,                           # ok/missing/count
+        }
 translation_service = TranslationService()
+
+# tesst
+def _run_translation_service_self_test() -> None:
+    print("\n========== TranslationService SELF-TEST ==========\n", flush=True)
+
+    # Test data: có dấu câu, xuống dòng, URL/email, ngày giờ, số %, code...
+    sample_text = """
+    Xin chào bạn! Hôm nay là 2026-01-06.
+    Liên hệ: test.user+abc@gmail.com hoặc www.example.com.
+    Link: https://example.com/a/b?x=1,y=2.
+    Mã: HD-2026-001, A-203.
+    Thời gian: 13:45. Tỉ lệ 12.5%.
+    Dòng 2: Đây là một câu dài để thử chia chunk theo token budget. Cảm ơn!
+    """.strip()
+
+    # 0) Khởi tạo service test (bật in chunk nếu bạn muốn thấy quá trình chia)
+    svc = TranslationService(
+        model_path=r"D:\translation_models\vinai-translate-vi2en-v2",
+        max_input_tokens=80,     # giảm để dễ thấy chunk
+        batch_size=2,
+        print_chunks=True,       # bật in ra đoạn chia chunk + ghép word
+    )
+
+    # 1) Test _normalize
+    norm = svc._normalize("   A   B \n  C   ")
+    assert norm == "A B C", f"_normalize FAIL: got={norm!r}"
+    print("[OK] _normalize", flush=True)
+
+    # 2) Test _split_sentences
+    sents = svc._split_sentences("Câu 1. Câu 2!\nCâu 3?  Câu 4。")
+    assert len(sents) == 4, f"_split_sentences FAIL: len={len(sents)} sents={sents}"
+    print("[OK] _split_sentences", flush=True)
+
+    # 3) Test _extract_invariants
+    inv = svc._extract_invariants(sample_text)
+    # chỉ cần check có chứa một vài invariant chính
+    must_have = ["2026-01-06", "test.user+abc@gmail.com", "www.example.com", "HD-2026-001", "13:45", "12.5%"]
+    for x in must_have:
+        assert x in inv, f"_extract_invariants FAIL: missing {x}"
+    print("[OK] _extract_invariants", flush=True)
+
+    # 4) Test check_invariants (case OK)
+    inv_check_ok = svc.check_invariants(sample_text, sample_text)
+    assert inv_check_ok["ok"] is True, f"check_invariants FAIL (expected ok=True): {inv_check_ok}"
+    print("[OK] check_invariants (ok case)", flush=True)
+
+    # 5) Test check_invariants (case missing)
+    out_missing = "Xin chào! Hôm nay là 2026-01-06. Liên hệ: email bị mất."
+    inv_check_bad = svc.check_invariants(sample_text, out_missing)
+    assert inv_check_bad["ok"] is False and len(inv_check_bad["missing"]) > 0, \
+        f"check_invariants FAIL (expected missing): {inv_check_bad}"
+    print("[OK] check_invariants (missing case)", flush=True)
+
+    # 6) Model-dependent tests: load_model, split_into_chunks, _translate_batch, translate
+    print("\n--- Model-dependent tests ---", flush=True)
+    try:
+        svc.load_model()
+        print(f"[OK] load_model | device={svc.device}", flush=True)
+
+        # split_into_chunks cần tokenizer -> test chunking theo token
+        chunks = svc.split_into_chunks(sample_text)
+        assert len(chunks) > 0, "split_into_chunks FAIL: no chunks"
+        print(f"[OK] split_into_chunks | chunks_count={len(chunks)}", flush=True)
+
+        # _translate_batch test nhỏ (1-2 chunk đầu)
+        small_batch = chunks[: min(2, len(chunks))]
+        out_batch = svc._translate_batch(small_batch)
+        assert len(out_batch) == len(small_batch), "_translate_batch FAIL: output size mismatch"
+        print("[OK] _translate_batch", flush=True)
+
+        # translate test đầy đủ
+        result = svc.translate(sample_text)
+        assert result.get("success") is True, f"translate FAIL: {result}"
+        assert isinstance(result.get("translated_text"), str) and result["translated_text"].strip(), \
+            "translate FAIL: empty translated_text"
+        print("[OK] translate", flush=True)
+
+        # In nhanh kết quả để bạn nhìn
+        print("\n--- Translate RESULT (preview) ---", flush=True)
+        print("device:", result.get("device"), flush=True)
+        print("chunks_count:", result.get("chunks_count"), flush=True)
+        print("invariants:", result.get("invariants"), flush=True)
+        print("translated_text (first 400 chars):", result["translated_text"][:400], flush=True)
+
+    except FileNotFoundError as e:
+        print(f"[SKIP] Model not found -> bỏ qua test dịch: {e}", flush=True)
+    except Exception as e:
+        print(f"[FAIL] Model-dependent tests error: {type(e).__name__}: {e}", flush=True)
+        raise
+
+    print("\n========== SELF-TEST DONE ==========\n", flush=True)
+
+
+# Nếu chạy file trực tiếp: python translation_service.py
+# Java tương đương: public static void main(String[] args) { ... }
+if __name__ == "__main__":
+    _run_translation_service_self_test()
+

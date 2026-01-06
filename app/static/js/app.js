@@ -4,7 +4,6 @@ const state = {
     selectedFiles: [],
     textBlocks: [],
     selectedText: '',
-    lastTranslation: '',  // Lưu bản dịch gần nhất
     works: []
 };
 
@@ -425,23 +424,29 @@ async function saveToWork(id) {
 }
 
 // Text Selection & Tools
-function handleTextSelect() {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
+function handleTextSelect(event) {
+    // Delay nhỏ để đảm bảo selection đã được tạo
+    setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
 
-    if (text.length > 0 && text.length <= 2000) {
-        state.selectedText = text;
-        elements.selectedCharCount.textContent = text.length;
-        elements.toolsPanel.classList.remove('hidden');
-    } else {
-        clearTextSelection();  // Xóa selection nếu không hợp lệ
-    }
+        // Chỉ hiển thị tools panel khi có text được chọn
+        if (text.length > 0 && text.length <= 2000) {
+            state.selectedText = text;
+            elements.selectedCharCount.textContent = text.length;
+            elements.toolsPanel.classList.remove('hidden');
+        } else if (text.length === 0 && elements.toolsPanel && !elements.toolsPanel.classList.contains('hidden')) {
+            // Chỉ ẩn tools panel nếu nó đang hiển thị và không còn text được chọn
+            state.selectedText = '';
+            elements.toolsPanel.classList.add('hidden');
+        }
+    }, 10);
 }
 
 // Hàm xóa selection và ẩn tools panel
 function clearTextSelection() {
     const selection = window.getSelection();
-    if (selection) {
+    if (selection && selection.rangeCount > 0) {
         selection.removeAllRanges();  // Xóa vùng chọn
     }
     state.selectedText = '';
@@ -479,43 +484,9 @@ async function runTTS() {
     }
 }
 
+// Dịch text được chọn - gọi translateSelectedText() trực tiếp
 function showTranslateModal() {
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>🌐 Dịch văn bản (Việt → Anh)</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="form-group">
-            <label>Model: VinAI (Vietnamese → English)</label>
-        </div>
-        <button class="btn btn-primary" onclick="runTranslate()">Dịch</button>
-        <div id="translate-result" class="result-panel mt-2"></div>
-    `;
-    elements.modalOverlay.classList.remove('hidden');
-}
-
-async function runTranslate() {
-    // VinAI model chỉ hỗ trợ Việt → Anh
-    try {
-        const res = await fetch('/api/tools/translate', {  // Fix: Đúng route
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: state.selectedText,
-                src_lang: 'vi',
-                dest_lang: 'en'
-            })
-        });
-        const result = await res.json();
-        document.getElementById('translate-result').innerHTML = result.success
-            ? `<p><strong>Kết quả:</strong></p><p>${result.translated_text}</p>`
-            : `<p style="color:red">${result.error}</p>`;
-
-        // Xóa selection sau khi dịch xong
-        clearTextSelection();
-    } catch (e) {
-        document.getElementById('translate-result').innerHTML = `<p style="color:red">Lỗi: ${e.message}</p>`;
-    }
+    translateSelectedText();
 }
 
 function showResearchModal() {
@@ -623,7 +594,7 @@ elements.modalOverlay.addEventListener('click', (e) => {
     if (e.target === elements.modalOverlay) closeModal();
 });
 
-// Hàm dịch toàn bộ text block từ Việt sang Anh
+// Dịch toàn bộ text block từ Việt sang Anh
 async function translateBlock(blockId, buttonElement) {
     const block = state.textBlocks.find(b => b.id === blockId);
     if (!block || !block.text || !block.text.trim()) {
@@ -631,62 +602,42 @@ async function translateBlock(blockId, buttonElement) {
         return;
     }
 
-    // Disable button và hiển thị loading
     buttonElement.disabled = true;
     buttonElement.innerHTML = '⏳ Đang dịch...';
 
     try {
-        const response = await fetch('/api/tools/translate', {  // Fix: Đúng route với tools blueprint
+        const response = await fetch('/api/tools/translate', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                text: block.text,  // VinAI model dịch Việt→Anh
+                text: block.text,
                 src_lang: 'vi',
                 dest_lang: 'en'
             })
         });
 
-        // Parse JSON response
         const data = await response.json();
 
-        console.log('Translation response:', data);  // Debug log
-
-        // Kiểm tra response
-        if (!response.ok || !data.success) {
+        if (!response.ok || !data.success || !data.translated_text) {
             throw new Error(data.error || 'Dịch thất bại');
         }
 
-        // Kiểm tra có kết quả dịch không
-        if (!data.translated_text) {
-            throw new Error('Không nhận được kết quả dịch');
-        }
-
-        // LƯU bản dịch vào block (không thay thế text gốc)
         block.translated = data.translated_text;
-
-        // Render lại để hiển thị cả 2 khung
         renderTextBlocks();
-
         showNotification('✓ Dịch hoàn tất!', 'success');
 
-        // Reset button
         buttonElement.disabled = false;
         buttonElement.innerHTML = '✓ Đã dịch';
         buttonElement.classList.add('btn-success');
 
     } catch (error) {
-        console.error('Lỗi dịch:', error);
         showNotification(error.message || 'Dịch thất bại', 'error');
-
-        // Reset button
         buttonElement.disabled = false;
         buttonElement.innerHTML = '🌐 Translate All';
     }
 }
 
-// Hàm dịch text được chọn từ Việt sang Anh
+// Dịch text được chọn từ Việt sang Anh
 async function translateSelectedText() {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -697,41 +648,27 @@ async function translateSelectedText() {
     }
 
     try {
-        // Hiển thị modal loading
         showTranslationModal();
 
-        const response = await fetch('/api/tools/translate', {  // Fix: Đúng route với tools blueprint
+        const response = await fetch('/api/tools/translate', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                text: selectedText,  // VinAI model dịch Việt→Anh
+                text: selectedText,
                 src_lang: 'vi',
                 dest_lang: 'en'
             })
         });
 
-        // Parse JSON response
         const data = await response.json();
 
-        console.log('Translation response:', data);  // Debug log
-
-        // Kiểm tra response
-        if (!response.ok || !data.success) {
+        if (!response.ok || !data.success || !data.translated_text) {
             throw new Error(data.error || 'Dịch thất bại');
         }
 
-        // Kiểm tra có kết quả dịch không
-        if (!data.translated_text) {
-            throw new Error('Không nhận được kết quả dịch');
-        }
-
-        // Hiển thị kết quả dịch
         showTranslationResult(selectedText, data.translated_text);
 
     } catch (error) {
-        console.error('Lỗi dịch:', error);
         hideTranslationModal();
         showNotification(error.message || 'Dịch thất bại', 'error');
     }
@@ -761,15 +698,11 @@ function showTranslationResult(original, translated) {
     const modal = document.getElementById('translation-modal');
     if (!modal) return;
 
-    // Escape HTML để tránh lỗi XSS
     const escapeHtml = (text) => {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     };
-
-    const originalEscaped = escapeHtml(original);
-    const translatedEscaped = escapeHtml(translated);
 
     modal.innerHTML = `
         <div class="modal-content">
@@ -780,43 +713,27 @@ function showTranslationResult(original, translated) {
             <div class="modal-body">
                 <div class="translation-box">
                     <label>Bản gốc (Tiếng Việt):</label>
-                    <div class="text-box">${originalEscaped}</div>
+                    <div class="text-box">${escapeHtml(original)}</div>
                 </div>
                 <div class="translation-box">
                     <label>Bản dịch (Tiếng Anh):</label>
-                    <div class="text-box">${translatedEscaped}</div>
+                    <div class="text-box">${escapeHtml(translated)}</div>
                 </div>
                 <div class="modal-actions">
-                    <button class="btn btn-primary" onclick="copyTranslationText()">
-                        📋 Sao chép bản dịch
-                    </button>
-                    <button class="btn btn-secondary" onclick="hideTranslationModal()">
-                        Đóng
-                    </button>
+                    <button class="btn btn-primary" onclick="copyTranslationText()">📋 Sao chép</button>
+                    <button class="btn btn-secondary" onclick="hideTranslationModal()">Đóng</button>
                 </div>
             </div>
         </div>
     `;
 
-    // Lưu translated text vào data attribute để copy
     modal.setAttribute('data-translated', translated);
 }
 
-// Ẩn modal
+// Ẩn modal dịch
 function hideTranslationModal() {
     const modal = document.getElementById('translation-modal');
-    if (modal) {
-        modal.remove();
-    }
-}
-
-// Copy bản dịch
-function copyTranslation(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showNotification('Đã sao chép bản dịch!', 'success');
-    }).catch(() => {
-        showNotification('Lỗi khi sao chép', 'error');
-    });
+    if (modal) modal.remove();
 }
 
 // Copy bản dịch từ modal
