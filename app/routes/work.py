@@ -10,7 +10,7 @@ work_bp = Blueprint('work', __name__)
 @login_required
 def list_works():
     """List all works for current user"""
-    works = Work.query.filter_by(user_id=current_user.id)\
+    works = Work.query.filter_by(user_id=current_user.id, is_archived=False)\
         .order_by(Work.updated_at.desc()).all()
     return jsonify({
         'works': [w.to_dict() for w in works]
