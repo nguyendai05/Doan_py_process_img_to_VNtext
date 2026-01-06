@@ -2,6 +2,9 @@ from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_cors import CORS
+
+from dotenv import load_dotenv
+load_dotenv()
 from app.config import Config
 
 db = SQLAlchemy()
@@ -33,6 +36,14 @@ def create_app(config_class=Config):
     app.register_blueprint(work_bp, url_prefix='/api/works')
     app.register_blueprint(tools_bp, url_prefix='/api/tools')
 
+    print("👉 DB URI:", app.config['SQLALCHEMY_DATABASE_URI'])
+    from sqlalchemy import text
+    with app.app_context():
+        try:
+            db.session.execute(text("SELECT 1"))
+            print("✅ Database connection OK")
+        except Exception as e:
+            print("❌ Database connection FAILED:", e)
     # Create database tables
     with app.app_context():
         db.create_all()

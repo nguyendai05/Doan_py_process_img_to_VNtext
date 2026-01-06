@@ -26,14 +26,10 @@ uploads/
 
 
 # Virtual env
+.venv/
 venv/
 env/
-.venv/
-.env/
 
-# IDE
-./vscode/
-./idea/
 
 # Flask instance chứa db
 instance/
