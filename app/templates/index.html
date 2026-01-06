@@ -11,13 +11,13 @@
             <input type="file" id="file-input" accept=".jpg,.jpeg,.png" hidden>
         </div>
         <button id="process-btn" class="btn btn-primary" disabled>
-            🚀 Xử lý OCR
+            <span>🚀</span> Xử lý OCR
         </button>
     </div>
 
     <!-- Preview Section -->
     <div id="preview-section" class="preview-section hidden">
-        <h4>Ảnh đã chọn:</h4>
+        <h4>🖼️ Ảnh đã chọn:</h4>
         <div id="image-preview" class="image-preview"></div>
     </div>
 
@@ -25,6 +25,11 @@
     <div id="results-section" class="results-section">
         <div id="text-blocks" class="text-blocks">
             <!-- Text blocks will be added here -->
+            <div class="empty-state" id="empty-results">
+                <div class="empty-state-icon">📝</div>
+                <h4>Kết quả OCR sẽ hiển thị ở đây</h4>
+                <p>Tải ảnh lên và nhấn "Xử lý OCR" để bắt đầu</p>
+            </div>
         </div>
     </div>
 </div>
@@ -32,11 +37,19 @@
 <!-- Tools Panel -->
 <div id="tools-panel" class="tools-panel hidden">
     <h4>🛠️ Công cụ xử lý</h4>
-    <p class="selected-text-info">Đã chọn: <span id="selected-char-count">0</span> ký tự</p>
+    <p class="selected-text-info">
+        <span>📋</span> Đã chọn: <strong id="selected-char-count">0</strong> ký tự
+    </p>
     <div class="tools-buttons">
-        <button class="tool-btn" data-tool="tts">🔊 Text-to-Speech</button>
-        <button class="tool-btn" data-tool="translate">🌐 Dịch</button>
-        <button class="tool-btn" data-tool="research">📚 Research</button>
+        <button class="tool-btn" data-tool="tts">
+            <span>🔊</span> Đọc văn bản
+        </button>
+        <button class="tool-btn" data-tool="translate">
+            <span>🌐</span> Dịch
+        </button>
+        <button class="tool-btn" data-tool="research">
+            <span>📚</span> Tra cứu
+        </button>
     </div>
 </div>
 {% endblock %}

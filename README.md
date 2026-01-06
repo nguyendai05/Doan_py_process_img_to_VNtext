@@ -1,135 +1,95 @@
 # Python OCR Web Application
 
-Ứng dụng web nhận diện văn bản từ hình ảnh (OCR) sử dụng EasyOCR, tích hợp các công cụ xử lý văn bản như dịch thuật, text-to-speech và phân tích nội dung.
+Ứng dụng web nhận diện văn bản từ hình ảnh (OCR) sử dụng EasyOCR, tích hợp các công cụ xử lý văn bản như dịch thuật, text-to-speech, phân tích nội dung và sửa lỗi chính tả bằng AI (BARTpho).
 
-## Tính năng chính
+## 🌟 Tính năng chính
 
-- **OCR (Optical Character Recognition)**: Nhận diện văn bản từ ảnh sử dụng EasyOCR, hỗ trợ tiếng Anh và tiếng Việt
-- **Xử lý văn bản**: Chuẩn hóa Unicode, sửa lỗi OCR theo rule-based, kiểm tra chính tả (spell-check)
-- **Text-to-Speech (TTS)**: Chuyển văn bản thành giọng nói sử dụng gTTS
-- **Dịch thuật**: Dịch văn bản sang nhiều ngôn ngữ qua Google Translate
-- **Research/Phân tích**: Tóm tắt, trích xuất từ khóa, tạo câu hỏi (hỗ trợ OpenAI API hoặc phân tích cơ bản)
-- **Quản lý Work**: Lưu trữ và quản lý lịch sử OCR theo từng work với các text block
+| Tính năng | Mô tả |
+|-----------|-------|
+| 🔍 **OCR** | Nhận diện văn bản từ ảnh (tiếng Việt + tiếng Anh) |
+| 🤖 **BART Correction** | Sửa lỗi chính tả bằng AI (BARTpho) |
+| 🔊 **Text-to-Speech** | Chuyển văn bản thành giọng nói (8 ngôn ngữ) |
+| 🌐 **Translation** | Dịch văn bản đa ngôn ngữ (11 ngôn ngữ) |
+| 📊 **Research** | Tóm tắt, trích xuất từ khóa, tạo câu hỏi |
+| 📁 **Work Management** | Quản lý phiên làm việc với text blocks |
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-- **Backend**: Flask 3.0, Flask-SQLAlchemy, Flask-Login
-- **Database**: SQLite (development) / MySQL (production)
-- **OCR Engine**: EasyOCR với OpenCV preprocessing
-- **TTS**: gTTS (Google Text-to-Speech)
-- **Translation**: googletrans
-- **Text Processing**: pyspellchecker
+- **Backend:** Flask 3.0, Flask-SQLAlchemy, Flask-Login
+- **Database:** SQLite (dev) / MySQL (production)
+- **OCR Engine:** EasyOCR + OpenCV
+- **AI Model:** BARTpho (Transformers, PyTorch)
+- **TTS:** gTTS | **Translation:** googletrans
+- **Testing:** pytest, hypothesis
 
-## Cài đặt
+## 🚀 Quick Start
 
 ```bash
-# Clone repository
+# Clone và setup
 git clone <repo-url>
 cd python-ocr
-
-# Tạo virtual environment
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
+venv\Scripts\activate  # Windows
 
-# Cài đặt dependencies
+# Install và chạy
 pip install -r requirements.txt
-
-# Cấu hình environment
 cp .env.example .env
-# Chỉnh sửa .env theo nhu cầu
-
-# Chạy ứng dụng
 python run.py
 ```
 
-Ứng dụng sẽ chạy tại: http://127.0.0.1:5000
+Truy cập: http://127.0.0.1:5000
 
-## Cấu hình (.env)
+## 📚 Documentation
 
-| Biến | Mô tả | Mặc định |
-|------|-------|----------|
-| `SECRET_KEY` | Flask secret key | dev-secret-key |
-| `USE_SQLITE` | Sử dụng SQLite thay vì MySQL | true |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Cấu hình MySQL | localhost:3306 |
-| `MAX_CONTENT_LENGTH` | Kích thước file tối đa (bytes) | 5242880 (5MB) |
-| `ALLOWED_EXTENSIONS` | Định dạng ảnh cho phép | jpg,jpeg,png |
-| `OCR_LANGUAGES` | Ngôn ngữ OCR | en,vi |
-| `MAX_TEXT_LENGTH` | Độ dài text tối đa cho tools | 2000 |
-| `OPENAI_API_KEY` | API key cho research nâng cao (tùy chọn) | - |
+| Tài liệu | Mô tả |
+|----------|-------|
+| [01-OVERVIEW.md](docs/01-OVERVIEW.md) | Tổng quan dự án |
+| [02-WORK-SUMMARY.md](docs/02-WORK-SUMMARY.md) | Bảng tóm tắt công việc đã làm/chưa làm |
+| [03-ARCHITECTURE.md](docs/03-ARCHITECTURE.md) | Kiến trúc hệ thống |
+| [04-MODULES.md](docs/04-MODULES.md) | Chi tiết các modules |
+| [05-DATABASE.md](docs/05-DATABASE.md) | Database schema |
+| [06-TESTING.md](docs/06-TESTING.md) | Hướng dẫn testing |
+| [07-INSTALLATION.md](docs/07-INSTALLATION.md) | Hướng dẫn cài đặt chi tiết |
+| [08-API-REFERENCE.md](docs/08-API-REFERENCE.md) | API Reference |
+| [09-PROJECT-STRUCTURE.md](docs/09-PROJECT-STRUCTURE.md) | Cấu trúc dự án |
 
-## API Endpoints
+## 📋 Trạng thái công việc
 
-### Authentication (`/api/auth`)
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| POST | `/register` | Đăng ký tài khoản | ❌ |
-| POST | `/login` | Đăng nhập | ❌ |
-| POST | `/logout` | Đăng xuất | ✅ |
-| GET | `/me` | Lấy thông tin user hiện tại | ✅ |
+### ✅ Đã hoàn thành (12 modules)
+- Authentication, OCR Engine, Text Processing, BART Correction
+- TTS Service (với caching), Translation Service (với caching)
+- Research Service, Work Management, Chat System
+- Database Schema, Testing (Unit + Property tests)
 
-### OCR (`/api/ocr`)
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| POST | `/single` | OCR một ảnh (field: `image`) | ✅ |
-| POST | `/multi` | OCR nhiều ảnh, tối đa 5 (field: `images`) | ✅ |
+### ⏳ Chưa hoàn thiện
+- Frontend UI/UX cần cải thiện
+- API Documentation (Swagger)
+- Production deployment (Docker)
+- Rate limiting
 
-### Works (`/api/works`)
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| GET | `/` | Danh sách works của user | ✅ |
-| POST | `/` | Tạo work mới | ✅ |
-| GET | `/<id>` | Chi tiết work | ✅ |
-| PUT | `/<id>` | Cập nhật work | ✅ |
-| DELETE | `/<id>` | Xóa work | ✅ |
-| POST | `/<id>/blocks` | Thêm text block vào work | ✅ |
-| DELETE | `/<id>/blocks/<block_id>` | Xóa text block | ✅ |
-| POST | `/<id>/merge` | Gộp nhiều text blocks | ✅ |
+*Chi tiết: [02-WORK-SUMMARY.md](docs/02-WORK-SUMMARY.md)*
 
-### Tools (`/api/tools`)
-| Method | Endpoint | Mô tả | Auth |
-|--------|----------|-------|------|
-| POST | `/tts` | Chuyển text thành audio | ✅ |
-| GET | `/tts/languages` | Danh sách ngôn ngữ TTS | ❌ |
-| POST | `/translate` | Dịch văn bản | ✅ |
-| GET | `/translate/languages` | Danh sách ngôn ngữ dịch | ❌ |
-| POST | `/research` | Phân tích văn bản (summary/keywords/questions) | ✅ |
-
-## Cấu trúc dự án
+## 📁 Cấu trúc chính
 
 ```
+python-ocr/
 ├── app/
-│   ├── __init__.py          # App factory, khởi tạo extensions
-│   ├── config.py            # Cấu hình ứng dụng
-│   ├── models/              # Database models
-│   │   ├── user.py          # User model
-│   │   ├── work.py          # Work model
-│   │   └── text_block.py    # TextBlock model
-│   ├── routes/              # API routes
-│   │   ├── auth.py          # Authentication endpoints
-│   │   ├── ocr.py           # OCR endpoints
-│   │   ├── work.py          # Work management endpoints
-│   │   └── tools.py         # TTS, Translate, Research endpoints
-│   ├── services/            # Business logic
-│   │   ├── ocr_service.py   # EasyOCR wrapper với preprocessing
-│   │   ├── text_processing.py # Xử lý văn bản, spell-check
-│   │   ├── tts_service.py   # Text-to-Speech service
-│   │   ├── translate_service.py # Translation service
-│   │   └── research_service.py  # Text analysis service
-│   ├── static/              # Static files (CSS, JS, audio)
-│   └── templates/           # Jinja2 templates
-├── instance/                # SQLite database
-├── static/audio/            # Generated TTS audio files
-├── requirements.txt
-├── run.py                   # Entry point
-└── .env.example
+│   ├── models/      # Database models
+│   ├── routes/      # API endpoints
+│   ├── services/    # Business logic
+│   ├── static/      # CSS, JS, audio
+│   └── templates/   # HTML templates
+├── db/              # Database schema
+├── docs/            # Documentation
+├── models/          # BART model
+├── tests/           # Test files
+└── run.py           # Entry point
 ```
 
-## Yêu cầu hệ thống
-
-- Python 3.9+
-- RAM: Tối thiểu 4GB (EasyOCR cần bộ nhớ để load model)
-
-## License
+## 📄 License
 
 MIT
+
+---
+
+*Last updated: January 7, 2026*

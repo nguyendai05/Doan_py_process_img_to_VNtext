@@ -62,6 +62,12 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Invalid email or password'}), 401
 
+    if not user.is_active:
+        return jsonify({'error': 'Account is disabled'}), 403
+
+    user.update_last_login()
+    db.session.commit()
+    
     login_user(user)
 
     return jsonify({

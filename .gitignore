@@ -1,59 +1,126 @@
+# ============================================
 # Python
+# ============================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-
-# IDE
-.vscode/
-.idea/
-
-# Uploads
-uploads/
-
-# Logs
-*.log
-
-# Database
-*.db
-*.sqlite
-
-# Python
 *.pyc
 *.pyo
 *.pyd
 
-
-# Virtual env
+# ============================================
+# Virtual Environment
+# ============================================
 venv/
 env/
 .venv/
 .env/
+ENV/
 
-# IDE
-./vscode/
-./idea/
+# ============================================
+# IDE / Editor
+# ============================================
+.vscode/
+.idea/
+.kiro/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
 
-# Flask instance chứa db
+# ============================================
+# Environment Variables
+# ============================================
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
 instance/
 
-# Uploaded images (nếu có)
+# ============================================
+# Uploads & Media
+# ============================================
+uploads/
 media/
 temp/
-/static
 
+# ============================================
+# Static Generated Files
+# ============================================
+app/static/audio/*.mp3
+static/audio/*.mp3
 
-# Model files lớn
-/models/
+# ============================================
+# AI Models (large files)
+# ============================================
+models/bartpho_correction_model/
 *.pt
 *.pth
 *.h5
+*.safetensors
+*.bin
+!models/.gitkeep
 
+# ============================================
+# Testing
+# ============================================
+tests/
+.pytest_cache/
+.hypothesis/
+htmlcov/
+.coverage
+coverage.xml
+*.cover
+test_audio/
 
-# OS
+# ============================================
+# Logs
+# ============================================
+*.log
+logs/
+
+# ============================================
+# OS Generated
+# ============================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# Environment variables
-.env
+# ============================================
+# Build / Distribution
+# ============================================
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+*.manifest
+*.spec
+
+# ============================================
+# Jupyter Notebook
+# ============================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ============================================
+# Misc
+# ============================================
+*.bak
+*.tmp
+*.temp
