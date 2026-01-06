@@ -29,6 +29,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initUpload();
     initTools();
     loadWorks();
+
+    // Xóa selection khi click ra ngoài vùng text
+    document.addEventListener('click', (e) => {
+        // Nếu click không phải vào textarea hoặc tools panel
+        if (!e.target.closest('.text-block-content') &&
+            !e.target.closest('.tools-panel') &&
+            !e.target.closest('.modal-content')) {
+            clearTextSelection();
+        }
+    });
 });
 
 // Auth Functions
@@ -178,6 +188,7 @@ async function logout() {
 
 function closeModal() {
     elements.modalOverlay.classList.add('hidden');
+    clearTextSelection();  // Xóa selection khi đóng modal
 }
 
 // Upload Functions
@@ -295,7 +306,9 @@ function renderTextBlocks() {
     state.textBlocks.forEach(block => {
         const div = document.createElement('div');
         div.className = 'text-block';
-        div.innerHTML = `
+
+        // HTML cho khung text gốc
+        let html = `
             <div class="text-block-header">
                 <span class="text-block-title">📄 ${block.title}</span>
                 <div class="text-block-actions">
@@ -303,15 +316,34 @@ function renderTextBlocks() {
                     <button class="btn btn-secondary btn-sm" onclick="saveToWork(${block.id})">💾 Save</button>
                     <button class="btn btn-secondary btn-sm" onclick="downloadText(${block.id})">⬇️ Download</button>
                     <button class="btn btn-secondary btn-sm" onclick="removeBlock(${block.id})">🗑️</button>
+                    <button class="btn btn-secondary btn-sm" onclick="translateBlock(${block.id}, this)">🌐 Translate All</button>
                 </div>
             </div>
-            <textarea 
+            <div class="text-block-label">🇻🇳 Tiếng Việt (Gốc):</div>
+            <textarea
                 class="text-block-content editable" 
                 data-id="${block.id}" 
                 onmouseup="handleTextSelect()"
                 oninput="updateBlockText(${block.id}, this.value)"
             >${block.text}</textarea>
         `;
+
+        // Nếu có bản dịch, hiển thị thêm khung bản dịch
+        if (block.translated) {
+            html += `
+                <div class="text-block-label" style="margin-top: 15px;">🇬🇧 Tiếng Anh (Bản dịch):</div>
+                <textarea
+                    class="text-block-content translated editable"
+                    data-id="${block.id}"
+                    oninput="updateTranslatedText(${block.id}, this.value)"
+                >${block.translated}</textarea>
+                <div class="text-block-actions" style="margin-top: 10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="copyTranslatedText(${block.id})">📋 Copy bản dịch</button>
+                </div>
+            `;
+        }
+
+        div.innerHTML = html;
         elements.textBlocks.appendChild(div);
     });
 }
@@ -320,6 +352,26 @@ function updateBlockText(id, newText) {
     const block = state.textBlocks.find(b => b.id === id);
     if (block) {
         block.text = newText;
+    }
+}
+
+// Cập nhật bản dịch khi user chỉnh sửa
+function updateTranslatedText(id, newText) {
+    const block = state.textBlocks.find(b => b.id === id);
+    if (block) {
+        block.translated = newText;
+    }
+}
+
+// Copy bản dịch
+function copyTranslatedText(id) {
+    const block = state.textBlocks.find(b => b.id === id);
+    if (block && block.translated) {
+        navigator.clipboard.writeText(block.translated).then(() => {
+            showNotification('✓ Đã copy bản dịch', 'success');
+        }).catch(() => {
+            showNotification('Lỗi khi copy', 'error');
+        });
     }
 }
 
@@ -372,17 +424,33 @@ async function saveToWork(id) {
 }
 
 // Text Selection & Tools
-function handleTextSelect() {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
+function handleTextSelect(event) {
+    // Delay nhỏ để đảm bảo selection đã được tạo
+    setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
 
-    if (text.length > 0 && text.length <= 2000) {
-        state.selectedText = text;
-        elements.selectedCharCount.textContent = text.length;
-        elements.toolsPanel.classList.remove('hidden');
-    } else {
-        elements.toolsPanel.classList.add('hidden');
+        // Chỉ hiển thị tools panel khi có text được chọn
+        if (text.length > 0 && text.length <= 2000) {
+            state.selectedText = text;
+            elements.selectedCharCount.textContent = text.length;
+            elements.toolsPanel.classList.remove('hidden');
+        } else if (text.length === 0 && elements.toolsPanel && !elements.toolsPanel.classList.contains('hidden')) {
+            // Chỉ ẩn tools panel nếu nó đang hiển thị và không còn text được chọn
+            state.selectedText = '';
+            elements.toolsPanel.classList.add('hidden');
+        }
+    }, 10);
+}
+
+// Hàm xóa selection và ẩn tools panel
+function clearTextSelection() {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+        selection.removeAllRanges();  // Xóa vùng chọn
     }
+    state.selectedText = '';
+    elements.toolsPanel.classList.add('hidden');  // Ẩn panel công cụ
 }
 
 function initTools() {
@@ -416,43 +484,9 @@ async function runTTS() {
     }
 }
 
+// Dịch text được chọn - gọi translateSelectedText() trực tiếp
 function showTranslateModal() {
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>🌐 Dịch văn bản</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="form-group">
-            <label>Ngôn ngữ đích</label>
-            <select id="dest-lang">
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
-                <option value="ja">日本語</option>
-                <option value="ko">한국어</option>
-                <option value="zh-cn">中文</option>
-            </select>
-        </div>
-        <button class="btn btn-primary" onclick="runTranslate()">Dịch</button>
-        <div id="translate-result" class="result-panel mt-2"></div>
-    `;
-    elements.modalOverlay.classList.remove('hidden');
-}
-
-async function runTranslate() {
-    const destLang = document.getElementById('dest-lang').value;
-    try {
-        const res = await fetch('/api/tools/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: state.selectedText, dest_lang: destLang })
-        });
-        const result = await res.json();
-        document.getElementById('translate-result').innerHTML = result.success
-            ? `<p><strong>Kết quả:</strong></p><p>${result.translated_text}</p>`
-            : `<p style="color:red">${result.error}</p>`;
-    } catch (e) {
-        alert('Lỗi dịch');
-    }
+    translateSelectedText();
 }
 
 function showResearchModal() {
@@ -559,3 +593,178 @@ async function loadWork(id) {
 elements.modalOverlay.addEventListener('click', (e) => {
     if (e.target === elements.modalOverlay) closeModal();
 });
+
+// Dịch toàn bộ text block từ Việt sang Anh
+async function translateBlock(blockId, buttonElement) {
+    const block = state.textBlocks.find(b => b.id === blockId);
+    if (!block || !block.text || !block.text.trim()) {
+        showNotification('Không có văn bản để dịch', 'warning');
+        return;
+    }
+
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '⏳ Đang dịch...';
+
+    try {
+        const response = await fetch('/api/tools/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: block.text,
+                src_lang: 'vi',
+                dest_lang: 'en'
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !data.translated_text) {
+            throw new Error(data.error || 'Dịch thất bại');
+        }
+
+        block.translated = data.translated_text;
+        renderTextBlocks();
+        showNotification('✓ Dịch hoàn tất!', 'success');
+
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = '✓ Đã dịch';
+        buttonElement.classList.add('btn-success');
+
+    } catch (error) {
+        showNotification(error.message || 'Dịch thất bại', 'error');
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = '🌐 Translate All';
+    }
+}
+
+// Dịch text được chọn từ Việt sang Anh
+async function translateSelectedText() {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+
+    if (!selectedText) {
+        showNotification('Vui lòng chọn văn bản để dịch', 'warning');
+        return;
+    }
+
+    try {
+        showTranslationModal();
+
+        const response = await fetch('/api/tools/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: selectedText,
+                src_lang: 'vi',
+                dest_lang: 'en'
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success || !data.translated_text) {
+            throw new Error(data.error || 'Dịch thất bại');
+        }
+
+        showTranslationResult(selectedText, data.translated_text);
+
+    } catch (error) {
+        hideTranslationModal();
+        showNotification(error.message || 'Dịch thất bại', 'error');
+    }
+}
+
+// Hiển thị modal loading khi đang dịch
+function showTranslationModal() {
+    const modal = document.createElement('div');
+    modal.id = 'translation-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌐 Đang dịch...</h3>
+            </div>
+            <div class="modal-body">
+                <div class="spinner"></div>
+                <p>Vui lòng đợi trong khi hệ thống dịch văn bản của bạn</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+// Hiển thị kết quả dịch
+function showTranslationResult(original, translated) {
+    const modal = document.getElementById('translation-modal');
+    if (!modal) return;
+
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    };
+
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌐 Kết Quả Dịch</h3>
+                <button class="close-btn" onclick="hideTranslationModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="translation-box">
+                    <label>Bản gốc (Tiếng Việt):</label>
+                    <div class="text-box">${escapeHtml(original)}</div>
+                </div>
+                <div class="translation-box">
+                    <label>Bản dịch (Tiếng Anh):</label>
+                    <div class="text-box">${escapeHtml(translated)}</div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="copyTranslationText()">📋 Sao chép</button>
+                    <button class="btn btn-secondary" onclick="hideTranslationModal()">Đóng</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modal.setAttribute('data-translated', translated);
+}
+
+// Ẩn modal dịch
+function hideTranslationModal() {
+    const modal = document.getElementById('translation-modal');
+    if (modal) modal.remove();
+}
+
+// Copy bản dịch từ modal
+function copyTranslationText() {
+    const modal = document.getElementById('translation-modal');
+    if (modal) {
+        const text = modal.getAttribute('data-translated');
+        if (text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('✓ Đã sao chép bản dịch!', 'success');
+            }).catch(() => {
+                showNotification('Lỗi khi sao chép', 'error');
+            });
+        }
+    }
+}
+
+// Hiển thị thông báo
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+

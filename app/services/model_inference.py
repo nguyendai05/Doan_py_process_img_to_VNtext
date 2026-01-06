@@ -8,8 +8,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Model path - đặt trong thư mục models/ ở root project
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODEL_PATH = os.path.join(BASE_DIR, "models", "bartpho_correction_model")
+# BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# MODEL_PATH = os.path.join(BASE_DIR, "models", "bartpho_correction_model")
+MODEL_PATH = "D:/python_modeks/final_bartpho_correction_model"
+
 
 tokenizer = None
 model = None
