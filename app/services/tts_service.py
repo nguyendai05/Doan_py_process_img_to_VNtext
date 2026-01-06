@@ -1,44 +1,49 @@
 import os
+import uuid
 from gtts import gTTS
-from flask import url_for
-import hashlib
+from flask import current_app
+
 
 class TTSService:
     """Text-to-Speech service using gTTS"""
 
+    SUPPORTED_LANGUAGES = {
+        'en': 'English',
+        'vi': 'Vietnamese',
+        'fr': 'French',
+        'de': 'German',
+        'es': 'Spanish',
+        'ja': 'Japanese',
+        'ko': 'Korean',
+        'zh-CN': 'Chinese (Simplified)',
+    }
+
     @staticmethod
-    def text_to_speech(text, language='vi'):
-        """Convert text to speech and return audio file path"""
-        try:
-            # Tạo thư mục nếu chưa tồn tại
-            output_folder = os.path.join('app', 'static', 'audio')
-            os.makedirs(output_folder, exist_ok=True)
+    def text_to_speech(text, language='en'):
+        """
+        Convert text to speech audio file
+        Returns: path to generated audio file
+        """
+        if language not in TTSService.SUPPORTED_LANGUAGES:
+            language = 'vi'
 
-            # Tạo tên file unique
-            text_hash = hashlib.md5(text.encode()).hexdigest()
-            filename = f"tts_{text_hash}.mp3"
-            filepath = os.path.join(output_folder, filename)
+        # Generate unique filename
+        filename = f"tts_{uuid.uuid4().hex}.mp3"
+        output_folder = current_app.config.get('TTS_OUTPUT_FOLDER', 'app/static/audio')
 
-            # Tạo file audio
-            tts = gTTS(text=text, lang=language, slow=False)
-            tts.save(filepath)
+        # Ensure output folder exists
+        os.makedirs(output_folder, exist_ok=True)
 
-            # Trả về URL tương đối
-            return f"/static/audio/{filename}"
+        filepath = os.path.join(output_folder, filename)
 
-        except Exception as e:
-            raise Exception(f"TTS failed: {str(e)}")
+        # Generate audio
+        tts = gTTS(text=text, lang=language, slow=False)
+        tts.save(filepath)
+
+        # Return relative path for web access
+        return f"/static/audio/{filename}"
 
     @staticmethod
     def get_supported_languages():
-        """Get list of supported languages"""
-        return {
-            'vi': 'Tiếng Việt',
-            'en': 'English',
-            'ja': '日本語',
-            'ko': '한국어',
-            'zh-cn': '中文',
-            'fr': 'Français',
-            'de': 'Deutsch',
-            'es': 'Español'
-        }
+        """Get list of supported TTS languages"""
+        return TTSService.SUPPORTED_LANGUAGES

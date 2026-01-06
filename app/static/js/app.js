@@ -1,19 +1,14 @@
-// =======================
 // State
-// =======================
 const state = {
-    mode: 'single',
     user: null,
     selectedFiles: [],
-    originalImages: [],
     textBlocks: [],
     selectedText: '',
+    lastTranslation: '',  // Lưu bản dịch gần nhất
     works: []
 };
 
-// =======================
 // DOM Elements
-// =======================
 const elements = {
     authSection: document.getElementById('auth-section'),
     uploadArea: document.getElementById('upload-area'),
@@ -29,98 +24,28 @@ const elements = {
     modalContent: document.getElementById('modal-content')
 };
 
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initUpload();
-    initModeSwitch();
     initTools();
     loadWorks();
+
+    // Xóa selection khi click ra ngoài vùng text
+    document.addEventListener('click', (e) => {
+        // Nếu click không phải vào textarea hoặc tools panel
+        if (!e.target.closest('.text-block-content') &&
+            !e.target.closest('.tools-panel') &&
+            !e.target.closest('.modal-content')) {
+            clearTextSelection();
+        }
+    });
 });
 
-// =======================
-// Helpers
-// =======================
-function closeModal() {
-    elements.modalOverlay.classList.add('hidden');
+// Auth Functions
+function initAuth() {
+    checkAuth();
 }
-elements.modalOverlay?.addEventListener('click', (e) => {
-    if (e.target === elements.modalOverlay) closeModal();
-});
-
-function showLoadingModal(message) {
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>⏳ Đang xử lý...</h3>
-        </div>
-        <div style="padding: 2rem; text-align: center;">
-            <p>${message}</p>
-            <div class="loading-spinner"></div>
-        </div>
-    `;
-    elements.modalOverlay.classList.remove('hidden');
-}
-
-function showResultModal(title, content) {
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>${title}</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="result-panel">${content}</div>
-    `;
-    elements.modalOverlay.classList.remove('hidden');
-}
-
-function downloadTextAs(filename, text) {
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function getLanguageName(code) {
-    const names = {
-        'vi': '🇻🇳 Tiếng Việt',
-        'en': '🇬🇧 English',
-        'ja': '🇯🇵 日本語',
-        'ko': '🇰🇷 한국어',
-        'zh-CN': '🇨🇳 中文',
-        'fr': '🇫🇷 Français',
-        'de': '🇩🇪 Deutsch',
-        'es': '🇪🇸 Español'
-    };
-    return names[code] || code;
-}
-
-function getStyleName(style) {
-    const names = {
-        'general': 'Bình thường',
-        'cheerful': 'Vui vẻ',
-        'sad': 'Buồn',
-        'angry': 'Giận dữ',
-        'terrified': 'Sợ hãi',
-        'shouting': 'Hét',
-        'whispering': 'Thì thầm',
-        'newscast': 'Đọc tin',
-        'customer-service': 'Chăm sóc khách hàng',
-        'assistant': 'Trợ lý'
-    };
-    return names[style] || style;
-}
-
-function escapeHtml(s) {
-    return (s || '').replace(/[&<>"']/g, (c) => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-    }[c]));
-}
-
-// =======================
-// Auth
-// =======================
-function initAuth() { checkAuth(); }
 
 async function checkAuth() {
     try {
@@ -141,7 +66,6 @@ async function checkAuth() {
 }
 
 function renderAuthSection() {
-    if (!elements.authSection) return;
     if (state.user) {
         elements.authSection.innerHTML = `
             <div class="user-info">
@@ -204,7 +128,10 @@ function showRegisterModal() {
 async function handleLogin(e) {
     e.preventDefault();
     const form = e.target;
-    const data = { email: form.email.value, password: form.password.value };
+    const data = {
+        email: form.email.value,
+        password: form.password.value
+    };
 
     try {
         const res = await fetch('/api/auth/login', {
@@ -218,7 +145,9 @@ async function handleLogin(e) {
             renderAuthSection();
             loadWorks();
             closeModal();
-        } else alert(result.error || 'Đăng nhập thất bại');
+        } else {
+            alert(result.error || 'Đăng nhập thất bại');
+        }
     } catch (e) {
         alert('Lỗi kết nối');
     }
@@ -227,7 +156,10 @@ async function handleLogin(e) {
 async function handleRegister(e) {
     e.preventDefault();
     const form = e.target;
-    const data = { email: form.email.value, password: form.password.value };
+    const data = {
+        email: form.email.value,
+        password: form.password.value
+    };
 
     try {
         const res = await fetch('/api/auth/register', {
@@ -239,7 +171,9 @@ async function handleRegister(e) {
         if (res.ok) {
             alert('Đăng ký thành công! Vui lòng đăng nhập.');
             showLoginModal();
-        } else alert(result.error || 'Đăng ký thất bại');
+        } else {
+            alert(result.error || 'Đăng ký thất bại');
+        }
     } catch (e) {
         alert('Lỗi kết nối');
     }
@@ -253,33 +187,44 @@ async function logout() {
     renderWorkList();
 }
 
-// =======================
-// Upload
-// =======================
-function initUpload() {
-    if (!elements.uploadArea || !elements.fileInput || !elements.processBtn) return;
+function closeModal() {
+    elements.modalOverlay.classList.add('hidden');
+    clearTextSelection();  // Xóa selection khi đóng modal
+}
 
+// Upload Functions
+function initUpload() {
     const uploadArea = elements.uploadArea;
     const fileInput = elements.fileInput;
 
     uploadArea.addEventListener('click', () => fileInput.click());
-    uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
-    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('dragover');
+    });
+
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
         handleFiles(e.dataTransfer.files);
     });
 
-    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+    });
+
     elements.processBtn.addEventListener('click', processOCR);
 }
 
 function handleFiles(files) {
-    const maxFiles = state.mode === 'single' ? 1 : 5;
     const validFiles = Array.from(files)
         .filter(f => ['image/jpeg', 'image/png', 'image/jpg'].includes(f.type))
-        .slice(0, maxFiles);
+        .slice(0, 1);
 
     if (validFiles.length === 0) {
         alert('Vui lòng chọn file ảnh hợp lệ (JPG, PNG)');
@@ -287,14 +232,11 @@ function handleFiles(files) {
     }
 
     state.selectedFiles = validFiles;
-    state.originalImages = validFiles;
     renderPreview();
     elements.processBtn.disabled = false;
 }
 
 function renderPreview() {
-    if (!elements.imagePreview || !elements.previewSection) return;
-
     elements.imagePreview.innerHTML = '';
     state.selectedFiles.forEach((file, idx) => {
         const div = document.createElement('div');
@@ -313,116 +255,145 @@ function removeFile(idx) {
     if (state.selectedFiles.length === 0) {
         elements.previewSection.classList.add('hidden');
         elements.processBtn.disabled = true;
-    } else renderPreview();
+    } else {
+        renderPreview();
+    }
 }
 
-// =======================
-// Mode
-// =======================
-function initModeSwitch() {
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            state.mode = btn.dataset.mode;
-            if (elements.fileInput) elements.fileInput.multiple = state.mode === 'multi';
-            state.selectedFiles = [];
-            if (elements.previewSection) elements.previewSection.classList.add('hidden');
-            if (elements.processBtn) elements.processBtn.disabled = true;
-        });
-    });
-}
-
-// =======================
-// OCR
-// =======================
+// OCR Processing
 async function processOCR() {
     if (!state.user) {
         alert('Vui lòng đăng nhập để sử dụng OCR');
         showLoginModal();
         return;
     }
+
     if (state.selectedFiles.length === 0) return;
 
     elements.processBtn.disabled = true;
     elements.processBtn.textContent = '⏳ Đang xử lý...';
 
     const formData = new FormData();
-
-    if (state.mode === 'single') {
-        formData.append('image', state.selectedFiles[0]);
-        try {
-            const res = await fetch('/api/ocr/single', { method: 'POST', body: formData });
-            const result = await res.json();
-            if (result.success) addTextBlock(result.processed_text, state.selectedFiles[0].name, state.selectedFiles[0]);
-            else alert(result.error || 'OCR thất bại');
-        } catch (e) { alert('Lỗi kết nối'); }
-    } else {
-        state.selectedFiles.forEach(f => formData.append('images', f));
-        try {
-            const res = await fetch('/api/ocr/multi', { method: 'POST', body: formData });
-            const result = await res.json();
-            if (result.success) {
-                result.results.forEach((r, idx) => {
-                    if (r.success) addTextBlock(r.processed_text, r.filename, state.selectedFiles[idx]);
-                });
-            } else alert(result.error || 'OCR thất bại');
-        } catch (e) { alert('Lỗi kết nối'); }
+    formData.append('image', state.selectedFiles[0]);
+    
+    try {
+        const res = await fetch('/api/ocr/single', {
+            method: 'POST',
+            body: formData
+        });
+        const result = await res.json();
+        if (result.success) {
+            addTextBlock(result.bart_output, state.selectedFiles[0].name);
+        } else {
+            alert(result.error || 'OCR thất bại');
+        }
+    } catch (e) {
+        alert('Lỗi kết nối');
     }
 
     elements.processBtn.disabled = false;
     elements.processBtn.textContent = '🚀 Xử lý OCR';
 }
 
-// =======================
-// Blocks
-// =======================
-function addTextBlock(text, title, imageFile) {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    state.textBlocks.push({ id, text, title, imageFile: imageFile || null });
+// Text Blocks
+function addTextBlock(text, title = 'Untitled') {
+    const id = Date.now();
+    state.textBlocks.push({ id, text, title });
     renderTextBlocks();
 }
 
 function renderTextBlocks() {
-    if (!elements.textBlocks) return;
-
     elements.textBlocks.innerHTML = '';
     state.textBlocks.forEach(block => {
         const div = document.createElement('div');
         div.className = 'text-block';
 
-        const summarizeBtn = block.imageFile
-            ? `<button class="btn btn-secondary btn-sm" onclick="summarizeImage(${block.id})">🤖 Tóm tắt AI</button>` : '';
-
-        div.innerHTML = `
+        // HTML cho khung text gốc
+        let html = `
             <div class="text-block-header">
                 <span class="text-block-title">📄 ${block.title}</span>
                 <div class="text-block-actions">
                     <button class="btn btn-secondary btn-sm" onclick="copyText(${block.id})">📋 Copy</button>
-                    <button class="btn btn-secondary btn-sm" onclick="saveToWork(${block.id}, 'ocr')">💾 Save</button>
-                    <button class="btn btn-secondary btn-sm" onclick="downloadBlockText(${block.id})">⬇️ Download</button>
-                    ${summarizeBtn}
+                    <button class="btn btn-secondary btn-sm" onclick="saveToWork(${block.id})">💾 Save</button>
+                    <button class="btn btn-secondary btn-sm" onclick="downloadText(${block.id})">⬇️ Download</button>
                     <button class="btn btn-secondary btn-sm" onclick="removeBlock(${block.id})">🗑️</button>
-                    <button class="btn btn-primary btn-sm" onclick="openSpeakMenu(${block.id})">🎤translate or convert</button>
+                    <button class="btn btn-secondary btn-sm" onclick="translateBlock(${block.id}, this)">🌐 Translate All</button>
                 </div>
             </div>
-            <div class="text-block-content" data-id="${block.id}" onmouseup="handleTextSelect()">${block.text}</div>
+            <div class="text-block-label">🇻🇳 Tiếng Việt (Gốc):</div>
+            <textarea
+                class="text-block-content editable" 
+                data-id="${block.id}" 
+                onmouseup="handleTextSelect()"
+                oninput="updateBlockText(${block.id}, this.value)"
+            >${block.text}</textarea>
         `;
+
+        // Nếu có bản dịch, hiển thị thêm khung bản dịch
+        if (block.translated) {
+            html += `
+                <div class="text-block-label" style="margin-top: 15px;">🇬🇧 Tiếng Anh (Bản dịch):</div>
+                <textarea
+                    class="text-block-content translated editable"
+                    data-id="${block.id}"
+                    oninput="updateTranslatedText(${block.id}, this.value)"
+                >${block.translated}</textarea>
+                <div class="text-block-actions" style="margin-top: 10px;">
+                    <button class="btn btn-secondary btn-sm" onclick="copyTranslatedText(${block.id})">📋 Copy bản dịch</button>
+                </div>
+            `;
+        }
+
+        div.innerHTML = html;
         elements.textBlocks.appendChild(div);
     });
 }
 
-function copyText(id) {
+function updateBlockText(id, newText) {
     const block = state.textBlocks.find(b => b.id === id);
-    if (!block) return;
-    navigator.clipboard.writeText(block.text);
-    alert('Đã copy!');
+    if (block) {
+        block.text = newText;
+    }
 }
 
-function downloadBlockText(id) {
+// Cập nhật bản dịch khi user chỉnh sửa
+function updateTranslatedText(id, newText) {
     const block = state.textBlocks.find(b => b.id === id);
-    if (!block) return;
-    downloadTextAs(`${block.title}.txt`, block.text);
+    if (block) {
+        block.translated = newText;
+    }
+}
+
+// Copy bản dịch
+function copyTranslatedText(id) {
+    const block = state.textBlocks.find(b => b.id === id);
+    if (block && block.translated) {
+        navigator.clipboard.writeText(block.translated).then(() => {
+            showNotification('✓ Đã copy bản dịch', 'success');
+        }).catch(() => {
+            showNotification('Lỗi khi copy', 'error');
+        });
+    }
+}
+
+function copyText(id) {
+    const block = state.textBlocks.find(b => b.id === id);
+    if (block) {
+        navigator.clipboard.writeText(block.text);
+        alert('Đã copy!');
+    }
+}
+
+function downloadText(id) {
+    const block = state.textBlocks.find(b => b.id === id);
+    if (block) {
+        const blob = new Blob([block.text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${block.title}.txt`;
+        a.click();
+    }
 }
 
 function removeBlock(id) {
@@ -430,42 +401,51 @@ function removeBlock(id) {
     renderTextBlocks();
 }
 
-
-async function saveToWork(id, source_type = 'ocr', overrideTitle = null, overrideContent = null) {
+async function saveToWork(id) {
     const block = state.textBlocks.find(b => b.id === id);
     if (!block) return;
-
-    const title = overrideTitle || block.title;
-    const content = overrideContent != null ? overrideContent : block.text;
 
     try {
         const res = await fetch('/api/works', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, content, source_type })
+            body: JSON.stringify({
+                title: block.title,
+                content: block.text,
+                source_type: 'ocr'
+            })
         });
         if (res.ok) {
-            alert('Đã lưu!');
+            alert('Đã lưu vào Work!');
             loadWorks();
-        } else {
-            const r = await res.json().catch(() => ({}));
-            alert(r.error || 'Lỗi lưu');
         }
     } catch (e) {
         alert('Lỗi lưu');
     }
 }
 
+// Text Selection & Tools
 function handleTextSelect() {
     const selection = window.getSelection();
     const text = selection.toString().trim();
+
     if (text.length > 0 && text.length <= 2000) {
         state.selectedText = text;
-        if (elements.selectedCharCount) elements.selectedCharCount.textContent = text.length;
-        if (elements.toolsPanel) elements.toolsPanel.classList.remove('hidden');
+        elements.selectedCharCount.textContent = text.length;
+        elements.toolsPanel.classList.remove('hidden');
     } else {
-        if (elements.toolsPanel) elements.toolsPanel.classList.add('hidden');
+        clearTextSelection();  // Xóa selection nếu không hợp lệ
     }
+}
+
+// Hàm xóa selection và ẩn tools panel
+function clearTextSelection() {
+    const selection = window.getSelection();
+    if (selection) {
+        selection.removeAllRanges();  // Xóa vùng chọn
+    }
+    state.selectedText = '';
+    elements.toolsPanel.classList.add('hidden');  // Ẩn panel công cụ
 }
 
 function initTools() {
@@ -481,6 +461,7 @@ function initTools() {
 
 async function runTTS() {
     if (!state.selectedText) return;
+
     try {
         const res = await fetch('/api/tools/tts', {
             method: 'POST',
@@ -489,8 +470,10 @@ async function runTTS() {
         });
         const result = await res.json();
         if (result.success) {
-            showResultModal('Text-to-Speech', `<audio controls src="${result.audio_url}" style="width:100%"></audio>`);
-        } else alert(result.error);
+            showResultModal('Text-to-Speech', `<audio controls src="${result.audio_url}"></audio>`);
+        } else {
+            alert(result.error);
+        }
     } catch (e) {
         alert('Lỗi TTS');
     }
@@ -499,42 +482,39 @@ async function runTTS() {
 function showTranslateModal() {
     elements.modalContent.innerHTML = `
         <div class="modal-header">
-            <h3>🌐 Dịch văn bản</h3>
+            <h3>🌐 Dịch văn bản (Việt → Anh)</h3>
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="form-group">
-            <label>Ngôn ngữ đích</label>
-            <select id="dest-lang">
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
-                <option value="ja">日本語</option>
-                <option value="ko">한국어</option>
-                <option value="zh-CN">中文</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="es">Español</option>
-            </select>
+            <label>Model: VinAI (Vietnamese → English)</label>
         </div>
-        <button class="btn btn-primary" onclick="runTranslateSelected()">Dịch</button>
+        <button class="btn btn-primary" onclick="runTranslate()">Dịch</button>
         <div id="translate-result" class="result-panel mt-2"></div>
     `;
     elements.modalOverlay.classList.remove('hidden');
 }
 
-async function runTranslateSelected() {
-    const destLang = document.getElementById('dest-lang').value;
+async function runTranslate() {
+    // VinAI model chỉ hỗ trợ Việt → Anh
     try {
-        const res = await fetch('/api/tools/translate-context', {
+        const res = await fetch('/api/tools/translate', {  // Fix: Đúng route
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: state.selectedText, dest_lang: destLang })
+            body: JSON.stringify({
+                text: state.selectedText,
+                src_lang: 'vi',
+                dest_lang: 'en'
+            })
         });
         const result = await res.json();
         document.getElementById('translate-result').innerHTML = result.success
-            ? `<p><strong>Kết quả:</strong></p><div style="white-space:pre-wrap">${result.translated_text}</div>`
+            ? `<p><strong>Kết quả:</strong></p><p>${result.translated_text}</p>`
             : `<p style="color:red">${result.error}</p>`;
+
+        // Xóa selection sau khi dịch xong
+        clearTextSelection();
     } catch (e) {
-        alert('Lỗi dịch');
+        document.getElementById('translate-result').innerHTML = `<p style="color:red">Lỗi: ${e.message}</p>`;
     }
 }
 
@@ -570,16 +550,28 @@ async function runResearch() {
         let html = '';
         if (Array.isArray(result.result)) {
             html = '<ul>' + result.result.map(r => `<li>${r}</li>`).join('') + '</ul>';
-        } else html = `<p>${result.result}</p>`;
+        } else {
+            html = `<p>${result.result}</p>`;
+        }
         document.getElementById('research-result').innerHTML = html;
     } catch (e) {
         alert('Lỗi phân tích');
     }
 }
 
-async function loadWorks() {
-    if (!elements.workList) return;
+function showResultModal(title, content) {
+    elements.modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3>${title}</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="result-panel">${content}</div>
+    `;
+    elements.modalOverlay.classList.remove('hidden');
+}
 
+// Work History
+async function loadWorks() {
     if (!state.user) {
         elements.workList.innerHTML = '<p style="color:rgba(255,255,255,0.5);font-size:0.875rem">Đăng nhập để xem lịch sử</p>';
         return;
@@ -590,11 +582,12 @@ async function loadWorks() {
         const data = await res.json();
         state.works = data.works || [];
         renderWorkList();
-    } catch (e) {}
+    } catch (e) {
+        console.error('Load works error', e);
+    }
 }
 
 function renderWorkList() {
-    if (!elements.workList) return;
     if (state.works.length === 0) {
         elements.workList.innerHTML = '<p style="color:rgba(255,255,255,0.5);font-size:0.875rem">Chưa có work nào</p>';
         return;
@@ -616,8 +609,7 @@ async function loadWork(id) {
             state.textBlocks = data.work.text_blocks.map(b => ({
                 id: b.id,
                 text: b.content,
-                title: b.title || `Block ${b.id}`,
-                imageFile: null
+                title: b.title || `Block ${b.id}`
             }));
             renderTextBlocks();
         }
@@ -626,512 +618,236 @@ async function loadWork(id) {
     }
 }
 
+// Close modal on overlay click
+elements.modalOverlay.addEventListener('click', (e) => {
+    if (e.target === elements.modalOverlay) closeModal();
+});
 
-async function summarizeImage(blockId) {
+// Hàm dịch toàn bộ text block từ Việt sang Anh
+async function translateBlock(blockId, buttonElement) {
     const block = state.textBlocks.find(b => b.id === blockId);
-    showLoadingModal('Đang phân tích ảnh bằng Gemini AI...');
-    try {
-        const formData = new FormData();
-        formData.append('image', block.imageFile);
-
-        const res = await fetch('/api/tools/summarize-image', { method: 'POST', body: formData });
-        const result = await res.json();
-
-        if (result.success) {
-            showSummaryModal(block.title, result.summary, block.imageFile);
-        } else {
-            alert(result.error || 'Lỗi khi tóm tắt ảnh');
-            closeModal();
-        }
-    } catch (e) {
-        alert('Lỗi kết nối: ' + e.message);
-        closeModal();
+    if (!block || !block.text || !block.text.trim()) {
+        showNotification('Không có văn bản để dịch', 'warning');
+        return;
     }
-}
 
-function showSummaryModal(title, summary, imageFile) {
-    const imageUrl = URL.createObjectURL(imageFile);
-    const safe = summary.replace(/`/g, '\\`');
+    // Disable button và hiển thị loading
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = '⏳ Đang dịch...';
 
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>🤖 Tóm tắt nội dung ảnh</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-        <div class="summary-content">
-            <div class="summary-image">
-                <img src="${imageUrl}" alt="${title}" style="max-width: 100%; border-radius: 8px; margin-bottom: 1rem;">
-            </div>
-            <div class="summary-text">
-                <h4 style="margin-bottom: 1rem; color: #667eea;">📝 ${title}</h4>
-                <div style="white-space: pre-wrap; line-height: 1.6;">${summary}</div>
-            </div>
-            <div class="summary-actions" style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
-                <button class="btn btn-primary" onclick="navigator.clipboard.writeText(\`${safe}\`);alert('Đã copy!')">📋 Copy</button>
-                <button class="btn btn-secondary" onclick="downloadTextAs('summary_${title}.txt', \`${safe}\`)">⬇️ Download</button>
-            </div>
-        </div>
-    `;
-    elements.modalOverlay.classList.remove('hidden');
-}
-
-function openSpeakMenu(blockId) {
-    const block = state.textBlocks.find(b => b.id === blockId);
-    if (!block) return;
-
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>🛠️ Chọn chức năng</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
-
-        <div class="form-group">
-            <label>🌍 Ngôn ngữ</label>
-            <select id="menu-lang">
-                <option value="en">English</option>
-                <option value="vi">Tiếng Việt</option>
-                <option value="ja">日本語</option>
-                <option value="ko">한국어</option>
-                <option value="zh-CN">中文</option>
-                <option value="fr">Français</option>
-                <option value="de">Deutsch</option>
-                <option value="es">Español</option>
-            </select>
-        </div>
-
-        <div style="display:flex; gap:.5rem;">
-            <button class="btn btn-primary" style="flex:1" onclick="openContextTranslate(${blockId})">🌐 Dịch (ngữ cảnh)</button>
-            <button class="btn btn-secondary" style="flex:1" onclick="showAdvancedTTS(${blockId})">🎤 Text to mp3</button>
-        </div>
-    `;
-    elements.modalOverlay.classList.remove('hidden');
-}
-
-async function openContextTranslate(blockId) {
-    const block = state.textBlocks.find(b => b.id === blockId);
-    if (!block) return;
-
-    const dest_lang = document.getElementById('menu-lang')?.value || 'en';
-
-    showLoadingModal('Đang dịch theo ngữ cảnh...');
     try {
-        const res = await fetch('/api/tools/translate-context', {
+        const response = await fetch('/api/tools/translate', {  // Fix: Đúng route với tools blueprint
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: block.text, dest_lang })
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text: block.text,  // VinAI model dịch Việt→Anh
+                src_lang: 'vi',
+                dest_lang: 'en'
+            })
         });
-        const r = await res.json();
-        if (!r.success) {
-            alert(r.error || 'Dịch thất bại');
-            closeModal();
-            return;
+
+        // Parse JSON response
+        const data = await response.json();
+
+        console.log('Translation response:', data);  // Debug log
+
+        // Kiểm tra response
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Dịch thất bại');
         }
 
-        const translated = r.translated_text || '';
-        const safe = translated.replace(/`/g, '\\`');
+        // Kiểm tra có kết quả dịch không
+        if (!data.translated_text) {
+            throw new Error('Không nhận được kết quả dịch');
+        }
 
-        elements.modalContent.innerHTML = `
-            <div class="modal-header">
-                <h3>🌐 Dịch theo ngữ cảnh (${getLanguageName(dest_lang)})</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
+        // LƯU bản dịch vào block (không thay thế text gốc)
+        block.translated = data.translated_text;
 
-            <div class="result-panel" style="white-space:pre-wrap; line-height:1.6;">${translated}</div>
+        // Render lại để hiển thị cả 2 khung
+        renderTextBlocks();
 
-            <div style="display:flex; gap:.5rem; margin-top:1rem;">
-                <button class="btn btn-primary" onclick="saveToWork(${blockId}, 'translate', 'Translate - ${block.title}', \`${safe}\`)">💾 Save</button>
-                <button class="btn btn-secondary" onclick="downloadTextAs('translate_${block.title}.txt', \`${safe}\`)">⬇️ Download</button>
-            </div>
-        `;
-        elements.modalOverlay.classList.remove('hidden');
+        showNotification('✓ Dịch hoàn tất!', 'success');
 
-    } catch (e) {
-        alert('Lỗi kết nối');
-        closeModal();
+        // Reset button
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = '✓ Đã dịch';
+        buttonElement.classList.add('btn-success');
+
+    } catch (error) {
+        console.error('Lỗi dịch:', error);
+        showNotification(error.message || 'Dịch thất bại', 'error');
+
+        // Reset button
+        buttonElement.disabled = false;
+        buttonElement.innerHTML = '🌐 Translate All';
     }
 }
 
-async function showAdvancedTTS(blockId) {
-    const block = state.textBlocks.find(b => b.id === blockId);
-    if (!block) return;
+// Hàm dịch text được chọn từ Việt sang Anh
+async function translateSelectedText() {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
 
-    const chosenLang = document.getElementById('menu-lang')?.value || 'vi';
+    if (!selectedText) {
+        showNotification('Vui lòng chọn văn bản để dịch', 'warning');
+        return;
+    }
 
-    const voicesRes = await fetch('/api/tools/tts/voices');
-    const voicesData = await voicesRes.json();
+    try {
+        // Hiển thị modal loading
+        showTranslationModal();
 
-    const voices = voicesData.voices;
+        const response = await fetch('/api/tools/translate', {  // Fix: Đúng route với tools blueprint
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text: selectedText,  // VinAI model dịch Việt→Anh
+                src_lang: 'vi',
+                dest_lang: 'en'
+            })
+        });
 
-    window.ttsVoicesData = voices;
+        // Parse JSON response
+        const data = await response.json();
 
-    elements.modalContent.innerHTML = `
-        <div class="modal-header">
-            <h3>🎤 Text to Speech (MP3)</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
-        </div>
+        console.log('Translation response:', data);  // Debug log
 
-        <div class="tts-config">
-            <div class="form-group">
-                <label>🌍 Ngôn ngữ</label>
-                <select id="tts-lang" onchange="updateVoiceOptions()">
-                    ${Object.keys(voices).map(lang => `
-                        <option value="${lang}" ${lang === chosenLang ? 'selected' : ''}>${getLanguageName(lang)}</option>
-                    `).join('')}
-                </select>
+        // Kiểm tra response
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Dịch thất bại');
+        }
+
+        // Kiểm tra có kết quả dịch không
+        if (!data.translated_text) {
+            throw new Error('Không nhận được kết quả dịch');
+        }
+
+        // Hiển thị kết quả dịch
+        showTranslationResult(selectedText, data.translated_text);
+
+    } catch (error) {
+        console.error('Lỗi dịch:', error);
+        hideTranslationModal();
+        showNotification(error.message || 'Dịch thất bại', 'error');
+    }
+}
+
+// Hiển thị modal loading khi đang dịch
+function showTranslationModal() {
+    const modal = document.createElement('div');
+    modal.id = 'translation-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌐 Đang dịch...</h3>
             </div>
-
-            <div class="form-group">
-                <label>👤 Giới tính</label>
-                <select id="tts-gender" onchange="updateVoiceList()">
-                    <option value="female">Nữ</option>
-                    <option value="male">Nam</option>
-                </select>
+            <div class="modal-body">
+                <div class="spinner"></div>
+                <p>Vui lòng đợi trong khi hệ thống dịch văn bản của bạn</p>
             </div>
-
-            <div class="form-group">
-                <label>🎙️ Giọng</label>
-                <select id="tts-voice"></select>
-            </div>
-
-            <div style="display:flex; gap:.5rem;">
-                <button class="btn btn-primary" style="flex:1" onclick="generateAdvancedTTS(${blockId})">🎤 Tạo MP3</button>
-                <button class="btn btn-secondary" style="flex:1; background:#10b981; border-color:#10b981; color:#fff;"
-                        onclick="openHighlightSpeak(${blockId})">🖍️ Highlight</button>
-            </div>
-
-            <div id="tts-result" class="tts-result" style="margin-top: 1.5rem;"></div>
         </div>
     `;
-
-    elements.modalOverlay.classList.remove('hidden');
-    updateVoiceOptions();
+    document.body.appendChild(modal);
 }
 
-function updateVoiceOptions() {
-    const lang = document.getElementById('tts-lang').value;
-    document.getElementById('tts-gender').value = 'female';
-    updateVoiceList();
-}
+// Hiển thị kết quả dịch
+function showTranslationResult(original, translated) {
+    const modal = document.getElementById('translation-modal');
+    if (!modal) return;
 
-function updateVoiceList() {
-    const lang = document.getElementById('tts-lang').value;
-    const gender = document.getElementById('tts-gender').value;
-    const voices = window.ttsVoicesData?.[lang]?.[gender] || [];
-    const voiceSelect = document.getElementById('tts-voice');
-    voiceSelect.innerHTML = voices.map((v, idx) => `<option value="${idx}">${v}</option>`).join('');
-}
-
-let lastTTSRequest = 0;
-const TTS_COOLDOWN = 1200;
-
-async function generateAdvancedTTS(blockId, overrideText = null) {
-    const now = Date.now();
-    if (now - lastTTSRequest < TTS_COOLDOWN) return null;
-    lastTTSRequest = now;
-
-    const block = state.textBlocks.find(b => b.id === blockId);
-    if (!block) return null;
-    const text = overrideText != null ? overrideText : block.text;
-
-    const config = {
-        text,
-        target_lang: document.getElementById('tts-lang').value,
-        voice_gender: document.getElementById('tts-gender').value,
-        voice_index: parseInt(document.getElementById('tts-voice').value, 10) || 0
+    // Escape HTML để tránh lỗi XSS
+    const escapeHtml = (text) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     };
 
-    const out = document.getElementById('tts-result');
-    out.innerHTML = `
-        <div style="text-align:center; padding: 2rem;">
-            <div class="loading-spinner"></div>
-            <p>Đang tạo giọng nói...</p>
-        </div>
-    `;
+    const originalEscaped = escapeHtml(original);
+    const translatedEscaped = escapeHtml(translated);
 
-    try {
-        const res = await fetch('/api/tools/advanced-tts', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
-        });
-        const result = await res.json();
-
-        if (result.success) {
-            out.innerHTML = `
-                <div class="tts-success">
-                    <h4 style="color: #10b981; margin-bottom: 1rem;">✅ Thành công!</h4>
-                    <audio controls style="width: 100%; margin-bottom: 1rem;">
-                        <source src="${result.audio_url}" type="audio/mpeg">
-                    </audio>
-                    <div style="display:flex; gap:.5rem;">
-                        <button class="btn btn-primary" onclick="downloadAudio('${result.audio_url}', '${result.filename}')">⬇️ Download MP3</button>
-                        <button class="btn btn-secondary" onclick="navigator.clipboard.writeText('${window.location.origin}${result.audio_url}');alert('Đã copy link!')">🔗 Copy link</button>
-                    </div>
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🌐 Kết Quả Dịch</h3>
+                <button class="close-btn" onclick="hideTranslationModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="translation-box">
+                    <label>Bản gốc (Tiếng Việt):</label>
+                    <div class="text-box">${originalEscaped}</div>
                 </div>
-            `;
-            return result;
-        } else {
-            out.innerHTML = `<div style="color:#ef4444; padding:1rem; background:rgba(239,68,68,.1); border-radius:8px;">❌ ${result.error}</div>`;
-            return null;
-        }
-    } catch (e) {
-        out.innerHTML = `<div style="color:#ef4444;">❌ Lỗi: ${e.message}</div>`;
-        return null;
-    }
-}
-
-function downloadAudio(url, filename) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-}
-
-async function hsGenerateTTS(text, config) {
-    const payload = {
-        text,
-        target_lang: config.target_lang || 'vi',
-        voice_gender: config.voice_gender || 'female',
-        voice_index: Number(config.voice_index || 0),
-    };
-
-    const res = await fetch('/api/tools/advanced-tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
-
-    return await res.json();
-}
-
-async function openHighlightSpeak(blockId) {
-    const block = state.textBlocks.find(b => b.id === blockId);
-    if (!block) return;
-
-    // snapshot config từ modal Advanced trước khi modal bị replace (NO rate/pitch/style)
-    const ttsConfigSnapshot = {
-        target_lang: document.getElementById('tts-lang')?.value || 'vi',
-        voice_gender: document.getElementById('tts-gender')?.value || 'female',
-        voice_index: parseInt(document.getElementById('tts-voice')?.value || '0', 10)
-    };
-
-    // dùng đúng ngôn ngữ đang chọn để dịch (highlight)
-    const dest_lang = ttsConfigSnapshot.target_lang || 'en';
-
-    showLoadingModal('Đang dịch theo ngữ cảnh để highlight...');
-    try {
-        const res = await fetch('/api/tools/translate-context', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: block.text, dest_lang })
-        });
-
-        const r = await res.json().catch(() => ({}));
-        if (!r || !r.success) {
-            closeModal();
-            return;
-        }
-
-        const translated = (r.translated_text || '').trim();
-        const lines = translated.split('\n').map(s => s.trim()).filter(Boolean);
-
-        elements.modalContent.innerHTML = `
-            <div class="modal-header">
-                <h3>🖍️ Highlight Speak (${getLanguageName(dest_lang)})</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <div class="translation-box">
+                    <label>Bản dịch (Tiếng Anh):</label>
+                    <div class="text-box">${translatedEscaped}</div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="copyTranslationText()">
+                        📋 Sao chép bản dịch
+                    </button>
+                    <button class="btn btn-secondary" onclick="hideTranslationModal()">
+                        Đóng
+                    </button>
+                </div>
             </div>
-
-            <div class="form-group">
-                <div><strong>Dòng đang đọc:</strong> <span id="hs-current-line">-</span></div>
-            </div>
-
-            <div id="hs-lines" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:1rem; max-height:45vh; overflow:auto;">
-                ${lines.map((l, i) => `<div class="hs-line" data-idx="${i}" style="padding:.35rem 0;">${escapeHtml(l)}</div>`).join('')}
-            </div>
-
-            <div style="display:flex; gap:.5rem; margin-top:1rem;">
-                <button class="btn btn-primary" onclick="hsPlay()">▶️ Phát + Highlight</button>
-                <button class="btn btn-secondary" onclick="hsDownloadVideo()">⬇️ Download video</button>
-            </div>
-
-            <div id="hs-audio-wrap" class="result-panel" style="margin-top:1rem;"></div>
-        `;
-        elements.modalOverlay.classList.remove('hidden');
-
-        window.__hs = {
-            blockId,
-            dest_lang,
-            translated,
-            lines,
-            ttsConfig: ttsConfigSnapshot, // chỉ còn target_lang/voice_gender/voice_index
-            audioEl: null,
-            lineTimes: [],
-            recordedChunks: [],
-            canvas: null,
-            ctx: null,
-            raf: null
-        };
-
-    } catch (e) {
-        closeModal();
-    }
-}
-
-async function hsPlay() {
-    const hs = window.__hs;
-    if (!hs) return;
-
-    const ttsResult = await hsGenerateTTS(hs.translated, hs.ttsConfig);
-    if (!ttsResult || !ttsResult.success || !ttsResult.audio_url) {
-        alert(ttsResult?.error || 'TTS thất bại');
-        return;
-    }
-
-    const audioWrap = document.getElementById('hs-audio-wrap');
-    audioWrap.innerHTML = `
-        <audio id="hs-audio" controls style="width:100%;">
-            <source src="${ttsResult.audio_url}" type="audio/mpeg">
-        </audio>
+        </div>
     `;
 
-    const audio = document.getElementById('hs-audio');
-    hs.audioEl = audio;
-
-    audio.onloadedmetadata = () => {
-        const total = audio.duration || 1;
-        const weights = hs.lines.map(l => Math.max(10, l.length));
-        const sum = weights.reduce((a,b)=>a+b,0) || 1;
-        let acc = 0;
-        hs.lineTimes = weights.map(w => {
-            const start = acc;
-            const dur = total * (w / sum);
-            acc += dur;
-            return { start, end: start + dur };
-        });
-    };
-
-    audio.ontimeupdate = () => {
-        const t = audio.currentTime || 0;
-        const idx = hs.lineTimes.findIndex(x => t >= x.start && t < x.end);
-        hsSetLine(idx);
-    };
-
-    audio.onended = () => hsSetLine(-1);
-    audio.play();
+    // Lưu translated text vào data attribute để copy
+    modal.setAttribute('data-translated', translated);
 }
 
-function hsSetLine(idx) {
-    const hs = window.__hs;
-    const label = document.getElementById('hs-current-line');
-    const linesEl = document.getElementById('hs-lines');
-    if (!hs || !linesEl) return;
+// Ẩn modal
+function hideTranslationModal() {
+    const modal = document.getElementById('translation-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
 
-    const els = linesEl.querySelectorAll('.hs-line');
-    els.forEach(el => {
-        const i = parseInt(el.dataset.idx, 10);
-        el.style.color = '#1e293b';
-        el.style.fontWeight = '400';
-        if (idx >= 0 && i < idx) {
-            el.style.color = '#2563eb'; // done blue
-        }
-        if (i === idx) {
-            el.style.color = '#ef4444'; // current red
-            el.style.fontWeight = '700';
-            el.scrollIntoView({ block: 'nearest' });
-        }
+// Copy bản dịch
+function copyTranslation(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showNotification('Đã sao chép bản dịch!', 'success');
+    }).catch(() => {
+        showNotification('Lỗi khi sao chép', 'error');
     });
-
-    if (idx >= 0) label.textContent = hs.lines[idx] || '-';
-    else label.textContent = '-';
 }
 
-async function hsDownloadVideo() {
-    const hs = window.__hs;
-    if (!hs || !hs.audioEl) {
-        alert('Bạn phải bấm phát trước để có audio.');
-        return;
-    }
-
-    const canvas = document.createElement('canvas');
-    canvas.width = 900;
-    canvas.height = 600;
-    const ctx = canvas.getContext('2d');
-    hs.canvas = canvas;
-    hs.ctx = ctx;
-
-    const stream = canvas.captureStream(30);
-
-    let audioStream = null;
-    try {
-        if (hs.audioEl.captureStream) audioStream = hs.audioEl.captureStream();
-        else if (hs.audioEl.mozCaptureStream) audioStream = hs.audioEl.mozCaptureStream();
-    } catch (e) {}
-
-    if (!audioStream) {
-        alert('Trình duyệt không hỗ trợ capture audio stream (Chrome thường OK).');
-        return;
-    }
-
-    const combined = new MediaStream([
-        ...stream.getVideoTracks(),
-        ...audioStream.getAudioTracks()
-    ]);
-
-    const recorder = new MediaRecorder(combined, { mimeType: 'video/webm' });
-    hs.recordedChunks = [];
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) hs.recordedChunks.push(e.data); };
-    recorder.onstop = () => {
-        const blob = new Blob(hs.recordedChunks, { type: 'video/webm' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'highlight_speak.webm';
-        a.click();
-        URL.revokeObjectURL(url);
-    };
-
-    const render = () => {
-        const curIdx = (() => {
-            const t = hs.audioEl.currentTime || 0;
-            const idx = hs.lineTimes.findIndex(x => t >= x.start && t < x.end);
-            return idx;
-        })();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = '#0f172a';
-        ctx.font = '22px Segoe UI';
-        ctx.fillText('Highlight Speak', 30, 40);
-
-        ctx.font = '18px Segoe UI';
-        let y = 90;
-        const maxLinesOnScreen = 20;
-
-        const start = Math.max(0, curIdx - 5);
-        const end = Math.min(hs.lines.length, start + maxLinesOnScreen);
-
-        for (let i = start; i < end; i++) {
-            if (curIdx >= 0 && i < curIdx) ctx.fillStyle = '#2563eb';
-            else if (i === curIdx) ctx.fillStyle = '#ef4444';
-            else ctx.fillStyle = '#1e293b';
-
-            ctx.fillText(hs.lines[i], 30, y);
-            y += 26;
+// Copy bản dịch từ modal
+function copyTranslationText() {
+    const modal = document.getElementById('translation-modal');
+    if (modal) {
+        const text = modal.getAttribute('data-translated');
+        if (text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('✓ Đã sao chép bản dịch!', 'success');
+            }).catch(() => {
+                showNotification('Lỗi khi sao chép', 'error');
+            });
         }
-
-        hs.raf = requestAnimationFrame(render);
-    };
-
-    recorder.start();
-    render();
-
-    const stopAll = () => {
-        try { cancelAnimationFrame(hs.raf); } catch(e){}
-        if (recorder.state !== 'inactive') recorder.stop();
-        hs.audioEl.removeEventListener('ended', stopAll);
-    };
-    hs.audioEl.addEventListener('ended', stopAll);
-
-    if (hs.audioEl.paused) hs.audioEl.play();
+    }
 }
+
+// Hiển thị thông báo
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
+}
+
