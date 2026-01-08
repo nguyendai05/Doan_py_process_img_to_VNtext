@@ -6,6 +6,7 @@ from app.models.work import Work, TextBlock
 from app.models.chat import ChatSession, ChatMessage
 from app.models.tts_audio import TTSAudio
 from app.models.translation import Translation
+from app.models.activity_log import ActivityLog
 
 __all__ = [
     'User',
@@ -18,4 +19,5 @@ __all__ = [
     'ChatMessage',
     'TTSAudio',
     'Translation',
+    'ActivityLog',
 ]
