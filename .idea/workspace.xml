@@ -4,7 +4,59 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="89bcf36d-7299-4828-b0e6-7cdecb9b05d6" name="Changes" comment="" />
+    <list default="true" id="89bcf36d-7299-4828-b0e6-7cdecb9b05d6" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/Doan_py_process_img_to_VNtext.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.vscode/settings.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/activity_log.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/chat.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/image.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/ocr_result.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/translation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/models/tts_audio.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/routes/chat.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/translate_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/translation_cache_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/services/tts_cache_service.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/db/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/db/apply_schema.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/db/migrations/001_initial_schema.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/db/schema.sql" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/01-OVERVIEW.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/02-WORK-SUMMARY.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/03-ARCHITECTURE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/04-MODULES.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/05-DATABASE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/06-TESTING.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/07-INSTALLATION.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/08-API-REFERENCE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/09-PROJECT-STRUCTURE.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/models/.gitkeep" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/audio/tts_c03e3e44a1354234b14ef6d7865d50ac.mp3" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/user.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/user.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/models/work.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/models/work.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/routes/auth.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/auth.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/routes/ocr.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/ocr.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/routes/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/routes/work.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/routes/work.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/model_inference.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/model_inference.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/services/tts_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/app/services/tts_service.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/app/static/css/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/static/js/app.js" beforeDir="false" afterPath="$PROJECT_DIR$/app/static/js/app.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/templates/base.html" beforeDir="false" afterPath="$PROJECT_DIR$/app/templates/base.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/templates/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/app/templates/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -13,9 +65,9 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 1
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 1
+}</component>
   <component name="ProjectId" id="36JkmNw9bTv82fCHIIhtf2GrE26" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -27,7 +79,8 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.git.unshallow": "true",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "main",
+    "dart.analysis.tool.window.visible": "false",
+    "git-widget-placeholder": "Merging develop",
     "ignore.virus.scanning.warn.message": "true",
     "junie.onboarding.icon.badge.shown": "true",
     "last_opened_file_path": "D:/PyCharm/Doan_py_img-to-text/Doan_py_process_img_to_VNtext",
