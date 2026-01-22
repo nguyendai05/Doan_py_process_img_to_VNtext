@@ -372,12 +372,14 @@ function renderTextBlocks() {
                 <div class="text-block-actions">
                     <button class="btn-action" onclick="copyText(${block.id})" title="Copy">📋</button>
                     <button class="btn-action" onclick="downloadText(${block.id})" title="Tải xuống">⬇️</button>
+                    <button class="btn-action" onclick="translateAllByModel()" title="Dịch tất cả (Model Vi→En)">🌐</button>
+                    <button class="btn-action" onclick="summarizeBlockByModel(${block.id})" title="Tóm tắt">📝</button>
                     <button class="btn-action btn-delete" onclick="removeBlock(${block.id})" title="Xóa">🗑️</button>
                 </div>
             </div>
-            <textarea 
-                class="text-block-content editable" 
-                data-id="${block.id}" 
+            <textarea
+                class="text-block-content editable"
+                data-id="${block.id}"
                 onmouseup="handleTextSelect()"
                 oninput="updateBlockText(${block.id}, this.value)"
                 placeholder="Nội dung văn bản..."
@@ -573,20 +575,20 @@ function initTools() {
 
 function showTTSModal() {
     if (!state.selectedText) return;
-
+    
     // Build language options grid
     const languageOptions = TTS_LANGUAGES.map(lang => {
         const isSelected = lang.code === ttsState.lastUsedLanguage;
         return `
-            <div class="tts-language-option ${isSelected ? 'selected' : ''}" 
-                 data-lang="${lang.code}" 
+            <div class="tts-language-option ${isSelected ? 'selected' : ''}"
+                 data-lang="${lang.code}"
                  onclick="selectTTSLanguage('${lang.code}')">
                 <span class="lang-flag">${lang.flag}</span>
                 <span class="lang-name">${lang.name}</span>
             </div>
         `;
     }).join('');
-
+    
     elements.modalContent.innerHTML = `
         <div class="modal-header">
             <h3>🔊 Text-to-Speech</h3>
@@ -607,7 +609,7 @@ function showTTSModal() {
         </div>
         <div id="tts-result" class="result-panel mt-2"></div>
     `;
-
+    
     // Set initial selected language
     ttsState.selectedLanguage = ttsState.lastUsedLanguage;
     elements.modalOverlay.classList.remove('hidden');
@@ -615,7 +617,7 @@ function showTTSModal() {
 
 function selectTTSLanguage(langCode) {
     ttsState.selectedLanguage = langCode;
-
+    
     // Update UI to show selected language
     document.querySelectorAll('.tts-language-option').forEach(el => {
         el.classList.remove('selected');
@@ -631,16 +633,16 @@ async function runTTS() {
 
     // Set generating state
     ttsState.isGenerating = true;
-
+    
     // Update UI to show loading state
     const generateBtn = document.getElementById('tts-generate-btn');
     const ttsToolBtn = document.querySelector('.tool-btn[data-tool="tts"]');
-
+    
     if (generateBtn) {
         generateBtn.disabled = true;
         generateBtn.innerHTML = '<span class="btn-text">⏳ Đang tạo audio...</span>';
     }
-
+    
     // Disable TTS button in tools panel
     if (ttsToolBtn) {
         ttsToolBtn.disabled = true;
@@ -657,17 +659,17 @@ async function runTTS() {
             })
         });
         const result = await res.json();
-
+        
         if (result.success) {
             // Save selected language to localStorage for next time
             localStorage.setItem('tts_language', ttsState.selectedLanguage);
             ttsState.lastUsedLanguage = ttsState.selectedLanguage;
-
+            
             // Show result in the TTS modal using renderAudioPlayer
             const ttsResultDiv = document.getElementById('tts-result');
             if (ttsResultDiv) {
                 ttsResultDiv.innerHTML = renderAudioPlayer(result.audio_url, result.from_cache);
-
+                
                 // Store audio reference for cleanup on modal close
                 const audioElement = document.getElementById('tts-audio-element');
                 if (audioElement) {
@@ -703,13 +705,13 @@ async function runTTS() {
     } finally {
         // Reset generating state
         ttsState.isGenerating = false;
-
+        
         // Re-enable buttons
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.innerHTML = '<span class="btn-text">🔊 Tạo Audio</span>';
         }
-
+        
         if (ttsToolBtn) {
             ttsToolBtn.disabled = false;
             ttsToolBtn.classList.remove('disabled');
@@ -723,13 +725,13 @@ async function runTTS() {
  */
 function showTranslateModal() {
     if (!state.selectedText) return;
-
+    
     // Build source language options grid (includes auto-detect)
     const sourceLanguageOptions = TRANSLATE_LANGUAGES.map(lang => {
         const isSelected = lang.code === translateState.sourceLang;
         return `
-            <div class="translate-lang-option ${isSelected ? 'selected' : ''}" 
-                 data-lang="${lang.code}" 
+            <div class="translate-lang-option ${isSelected ? 'selected' : ''}"
+                 data-lang="${lang.code}"
                  data-type="source"
                  onclick="selectSourceLang('${lang.code}')">
                 <span class="lang-flag">${lang.flag}</span>
@@ -737,15 +739,15 @@ function showTranslateModal() {
             </div>
         `;
     }).join('');
-
+    
     // Build destination language options grid (excludes auto-detect)
     const destLanguageOptions = TRANSLATE_LANGUAGES
         .filter(lang => lang.code !== 'auto')
         .map(lang => {
             const isSelected = lang.code === translateState.destLang;
             return `
-                <div class="translate-lang-option ${isSelected ? 'selected' : ''}" 
-                     data-lang="${lang.code}" 
+                <div class="translate-lang-option ${isSelected ? 'selected' : ''}"
+                     data-lang="${lang.code}"
                      data-type="dest"
                      onclick="selectDestLang('${lang.code}')">
                     <span class="lang-flag">${lang.flag}</span>
@@ -753,11 +755,11 @@ function showTranslateModal() {
                 </div>
             `;
         }).join('');
-
+    
     // Check if swap should be disabled (source is 'auto')
     const swapDisabled = translateState.sourceLang === 'auto';
     const swapTooltip = swapDisabled ? 'title="Không thể hoán đổi khi nguồn là Tự động phát hiện"' : '';
-
+    
     // Check if same language warning should be shown
     const showSameLangWarning = translateState.sourceLang !== 'auto' &&
         translateState.sourceLang === translateState.destLang;
@@ -777,9 +779,9 @@ function showTranslateModal() {
                 </div>
                 
                 <div class="translate-swap-section">
-                    <button class="swap-lang-btn ${swapDisabled ? 'disabled' : ''}" 
-                            onclick="swapLanguages()" 
-                            ${swapDisabled ? 'disabled' : ''} 
+                    <button class="swap-lang-btn ${swapDisabled ? 'disabled' : ''}"
+                            onclick="swapLanguages()"
+                            ${swapDisabled ? 'disabled' : ''}
                             ${swapTooltip}>
                         ⇄
                     </button>
@@ -818,7 +820,7 @@ function showTranslateModal() {
  */
 function selectSourceLang(langCode) {
     translateState.sourceLang = langCode;
-
+    
     // Update UI to show selected source language
     document.querySelectorAll('#source-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -826,7 +828,7 @@ function selectSourceLang(langCode) {
             el.classList.add('selected');
         }
     });
-
+    
     // Update swap button state (disabled if source is 'auto')
     const swapBtn = document.querySelector('.swap-lang-btn');
     if (swapBtn) {
@@ -840,7 +842,7 @@ function selectSourceLang(langCode) {
             swapBtn.title = '';
         }
     }
-
+    
     // Update same language warning
     updateSameLangWarning();
 }
@@ -852,7 +854,7 @@ function selectSourceLang(langCode) {
  */
 function selectDestLang(langCode) {
     translateState.destLang = langCode;
-
+    
     // Update UI to show selected destination language
     document.querySelectorAll('#dest-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -860,7 +862,7 @@ function selectDestLang(langCode) {
             el.classList.add('selected');
         }
     });
-
+    
     // Update same language warning
     updateSameLangWarning();
 }
@@ -875,12 +877,12 @@ function swapLanguages() {
     if (translateState.sourceLang === 'auto') {
         return;
     }
-
+    
     // Swap the languages
     const tempLang = translateState.sourceLang;
     translateState.sourceLang = translateState.destLang;
     translateState.destLang = tempLang;
-
+    
     // Update source language UI
     document.querySelectorAll('#source-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -888,7 +890,7 @@ function swapLanguages() {
             el.classList.add('selected');
         }
     });
-
+    
     // Update destination language UI
     document.querySelectorAll('#dest-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -896,7 +898,7 @@ function swapLanguages() {
             el.classList.add('selected');
         }
     });
-
+    
     // Update same language warning (should be same after swap)
     updateSameLangWarning();
 }
@@ -908,7 +910,7 @@ function swapLanguages() {
 function updateSameLangWarning() {
     const warningEl = document.getElementById('same-lang-warning');
     const translateBtn = document.getElementById('translate-btn');
-
+    
     // Show warning if source (not auto) equals destination
     const showWarning = translateState.sourceLang !== 'auto' &&
         translateState.sourceLang === translateState.destLang;
@@ -920,7 +922,7 @@ function updateSameLangWarning() {
             warningEl.classList.add('hidden');
         }
     }
-
+    
     // Disable translate button if same language
     if (translateBtn) {
         translateBtn.disabled = showWarning;
@@ -934,14 +936,14 @@ function updateSameLangWarning() {
 async function runTranslate() {
     if (!state.selectedText) return;
     if (translateState.isTranslating) return;
-
+    
     // Get language pair from translateState
     const sourceLang = translateState.sourceLang;
     const destLang = translateState.destLang;
-
+    
     // Set translating state
     translateState.isTranslating = true;
-
+    
     // Update UI to show loading state - Requirements: 2.1
     const translateBtn = document.getElementById('translate-btn');
     const translateToolBtn = document.querySelector('.tool-btn[data-tool="translate"]');
@@ -1317,9 +1319,9 @@ function renderAudioPlayer(audioUrl, fromCache) {
                 ${cacheIndicator}
             </div>
             <div class="audio-player-main">
-                <audio 
-                    controls 
-                    src="${audioUrl}" 
+                <audio
+                    controls
+                    src="${audioUrl}"
                     class="tts-audio-player"
                     preload="metadata"
                     id="tts-audio-element"
@@ -1433,10 +1435,10 @@ function startNewProcess() {
             <p>Tải ảnh lên và nhấn "Xử lý OCR" để bắt đầu</p>
         </div>
     `;
-
+    
     // Remove active state from work items
     document.querySelectorAll('.work-item').forEach(el => el.classList.remove('active'));
-
+    
     // Hide tools panel
     elements.toolsPanel.classList.add('hidden');
 }
@@ -1445,3 +1447,205 @@ function startNewProcess() {
 elements.modalOverlay.addEventListener('click', (e) => {
     if (e.target === elements.modalOverlay) closeModal();
 });
+
+let modelTranslateLastText = "";
+
+async function translateAllByModel() {
+    if (!state.user) {
+        alert('Vui lòng đăng nhập để dịch');
+        showLoginModal();
+        return;
+    }
+
+    if (!state.textBlocks || state.textBlocks.length === 0) return;
+
+    const combinedText = state.textBlocks
+        .map(b => (b.text || '').trim())
+        .filter(t => t.length > 0)
+        .join('\n\n');
+
+    if (!combinedText.trim()) return;
+
+    showResultModal('🌐 Dịch tất cả (Model Vi→En)', `
+        <div class="translate-loading">
+            <span class="loading-spinner">⏳</span>
+            <span class="loading-text">Đang dịch bằng model...</span>
+        </div>
+    `);
+
+    try {
+        const res = await fetch('/api/tools/translate-model-all', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: combinedText })
+        });
+
+        const result = await res.json();
+
+        modelTranslateLastText = result.translated_text || '';
+        showResultModal('🌐 Kết quả dịch (Model Vi→En)', renderModelTranslationResult(modelTranslateLastText));
+        showToast('✅ Dịch xong!', 'success');
+    } catch (e) {
+        // bỏ luôn lỗi: im lặng
+    }
+}
+
+function renderModelTranslationResult(text) {
+    return `
+        <div class="translation-result-container">
+            <div class="translation-result-header" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="font-weight:600;">✅ Dịch xong</div>
+                <div class="translation-result-actions" style="display:flex; gap:8px;">
+                    <button class="btn-action" onclick="copyModelTranslationResult()" title="Copy">📋</button>
+                    <button class="btn-action" onclick="downloadModelTranslationResult()" title="Tải xuống">⬇️</button>
+                </div>
+            </div>
+
+            <div class="translation-result-text"
+                 style="max-height:55vh; overflow:auto; white-space:pre-wrap; word-break:break-word; margin-top:10px;">
+                ${escapeHtml(text || '')}
+            </div>
+        </div>
+    `;
+}
+
+function copyModelTranslationResult() {
+    const text = modelTranslateLastText || '';
+    if (!text.trim()) return;
+
+    navigator.clipboard.writeText(text);
+}
+
+function downloadModelTranslationResult() {
+    const text = modelTranslateLastText || '';
+    if (!text.trim()) return;
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `translation_model_vi-en_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+}
+
+// ===========================
+// SUMMARY (Model) - NEW
+// Modal giống "dịch model" (copy + download + save)
+// ===========================
+
+let modelSummaryLastText = "";
+let modelSummaryLastTitle = "";
+let modelSummaryLastInput = ""; // giữ input để copy/download đúng ngữ cảnh (nếu bạn cần sau này)
+
+async function summarizeBlockByModel(blockId) {
+    const block = state.textBlocks.find(b => b.id === blockId);
+    if (!block) return;
+
+    if (!state.user) {
+        alert('Vui lòng đăng nhập để tóm tắt');
+        showLoginModal();
+        return;
+    }
+
+    const text = (block.text || '').trim();
+    if (!text) return;
+
+    // giữ input để phục vụ debug tương lai (không dùng rerun nữa nhưng để lại biến)
+    modelSummaryLastInput = text;
+
+    // UI loading modal
+    showResultModal('📝 Tóm tắt', `
+        <div class="translate-loading">
+            <span class="loading-spinner">⏳</span>
+            <span class="loading-text">Đang tóm tắt...</span>
+        </div>
+    `);
+
+    try {
+        // Gọi API summarize theo 1 thuật toán ensemble bên server (không cần algo nữa)
+        const res = await fetch('/api/tools/summarize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text,
+                debug: false
+            })
+        });
+
+        const result = await res.json();
+
+        if (!res.ok || !result.success) {
+            showResultModal('📝 Tóm tắt', `
+                <div class="translate-error">
+                    <span class="error-icon">⚠️</span>
+                    <span class="error-message">${escapeHtml(result.error || 'Tóm tắt thất bại')}</span>
+                </div>
+            `);
+            return;
+        }
+
+        modelSummaryLastText = result.result || '';
+        modelSummaryLastTitle = block.title || 'Untitled';
+
+        showResultModal('📝 Kết quả tóm tắt', renderModelSummaryResult(modelSummaryLastText));
+        showToast('✅ Tóm tắt xong!', 'success');
+
+    } catch (e) {
+        showResultModal('📝 Tóm tắt', `
+            <div class="translate-error">
+                <span class="error-icon">⚠️</span>
+                <span class="error-message">Lỗi kết nối</span>
+            </div>
+        `);
+    }
+}
+
+function renderModelSummaryResult(text) {
+    return `
+        <div class="translation-result-container">
+            <div class="translation-result-header" style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                <div style="font-weight:600;">✅ Tóm tắt xong</div>
+
+                <div class="translation-result-actions" style="display:flex; gap:8px;">
+                    <button class="btn-action" onclick="copyModelSummaryResult()" title="Copy">📋</button>
+                    <button class="btn-action" onclick="downloadModelSummaryResult()" title="Tải xuống">⬇️</button>
+                </div>
+            </div>
+
+            <div class="translation-result-text"
+                 style="max-height:55vh; overflow:auto; white-space:pre-wrap; word-break:break-word; margin-top:10px;">
+                ${escapeHtml(text || '')}
+            </div>
+        </div>
+    `;
+}
+
+function copyModelSummaryResult() {
+    const text = modelSummaryLastText || '';
+    if (!text.trim()) return;
+    navigator.clipboard.writeText(text);
+    showToast('Đã copy tóm tắt!', 'success');
+}
+
+function downloadModelSummaryResult() {
+    const text = modelSummaryLastText || '';
+    if (!text.trim()) return;
+
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `summary_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    URL.revokeObjectURL(url);
+}

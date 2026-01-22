@@ -16,15 +16,10 @@ class Config:
     DB_USER = os.getenv('DB_USER', 'root')
     DB_PASSWORD = os.getenv('DB_PASSWORD', '')
     
-    # Use SQLite for quick dev, set USE_SQLITE=false in .env for MySQL
-    USE_SQLITE = os.getenv('USE_SQLITE', 'true').lower() == 'true'
-    
-    if USE_SQLITE:
-        SQLALCHEMY_DATABASE_URI = 'sqlite:///app.db'
-    else:
-        # URL encode password to handle special characters like @
-        encoded_password = quote_plus(DB_PASSWORD)
-        SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    # MySQL connection only (removed SQLite support)
+    # URL encode password to handle special characters like @
+    encoded_password = quote_plus(DB_PASSWORD)
+    SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Upload

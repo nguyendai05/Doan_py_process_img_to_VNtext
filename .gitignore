@@ -23,7 +23,7 @@ ENV/
 # IDE / Editor
 # ============================================
 .vscode/
-.idea/
+.idea/*
 .kiro/
 *.swp
 *.swo

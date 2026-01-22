@@ -2,24 +2,41 @@ import easyocr
 import cv2
 import numpy as np
 from PIL import Image
-import io
+from vietocr.tool.predictor import Predictor
+from vietocr.tool.config import Cfg
+import torch
 
-# Global OCR reader instance (singleton)
 _ocr_reader = None
+_vietocr_predictor = None
 
 
 def init_ocr_reader(languages):
-    """Initialize OCR reader once at app startup"""
-    global _ocr_reader
+    """
+    Initialize OCR readers once at app startup
+    """
+    global _ocr_reader, _vietocr_predictor
+    GPU = torch.cuda.is_available()
+    print(f"[OCR] GPU Available: {GPU}")
+    
     if _ocr_reader is None:
-        _ocr_reader = easyocr.Reader(languages, gpu=False)
+        _ocr_reader = easyocr.Reader(languages, gpu=GPU)
+
+    if _vietocr_predictor is None:
+        config = Cfg.load_config_from_name("vgg_transformer")
+        config["device"] = "cuda" if GPU else "cpu"
+        _vietocr_predictor = Predictor(config)
+
     return _ocr_reader
 
 
 def get_ocr_reader():
-    """Get the singleton OCR reader"""
-    global _ocr_reader
+    """Get EasyOCR singleton"""
     return _ocr_reader
+
+
+def get_vietocr_predictor():
+    """Get VietOCR singleton"""
+    return _vietocr_predictor
 
 
 class OCRService:
@@ -29,64 +46,79 @@ class OCRService:
     def preprocess_image(image_bytes):
         """
         Preprocess image for better OCR accuracy
-        - Convert to grayscale
-        - Apply CLAHE for contrast enhancement
-        - Denoise
         """
-        # Convert bytes to numpy array
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img is None:
             raise ValueError("Cannot decode image")
 
-        # Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
         enhanced = clahe.apply(gray)
 
-        # Denoise
         denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
 
-        # Resize if too small (min 300px width)
-        height, width = denoised.shape
-        if width < 300:
-            scale = 300 / width
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            denoised = cv2.resize(denoised, (new_width, new_height), interpolation=cv2.INTER_CUBIC)
+        h, w = denoised.shape
+        if w < 300:
+            scale = 300 / w
+            denoised = cv2.resize(
+                denoised,
+                (int(w * scale), int(h * scale)),
+                interpolation=cv2.INTER_CUBIC
+            )
 
         return denoised
 
     @staticmethod
-    def extract_text(image_bytes, preprocess=True):
+    def extract_text(image_bytes, preprocess=True, use_vietocr=True):
         """
-        Extract text from image using EasyOCR
-        Returns list of text segments with confidence scores
+        Extract text from image
+        - EasyOCR: detect bbox
+        - VietOCR: recognize text (optional)
         """
         reader = get_ocr_reader()
+        vietocr = get_vietocr_predictor()
+
         if reader is None:
             raise RuntimeError("OCR reader not initialized")
+
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        original_img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if preprocess:
             processed_img = OCRService.preprocess_image(image_bytes)
         else:
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            processed_img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+            processed_img = cv2.cvtColor(original_img, cv2.COLOR_BGR2GRAY)
 
-        # Run OCR
         results = reader.readtext(processed_img)
 
-        # Extract text segments
         segments = []
-        for (bbox, text, confidence) in results:
-            # Convert numpy types to Python native types for JSON serialization
+
+        for bbox, easy_text, confidence in results:
+            x = [int(p[0]) for p in bbox]
+            y = [int(p[1]) for p in bbox]
+
+            crop = original_img[min(y):max(y), min(x):max(x)]
+            if crop.size == 0:
+                continue
+
+            final_text = easy_text
+
+            if use_vietocr and vietocr is not None:
+                pil_img = Image.fromarray(
+                    cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+                )
+                try:
+                    final_text = vietocr.predict(pil_img)
+                except Exception:
+                    final_text = easy_text  # fallback
+
             segments.append({
-                'text': text,
-                'confidence': float(confidence),
-                'bbox': [[int(coord) for coord in point] for point in bbox]
+                "text": final_text,
+                "confidence": float(confidence),
+                "bbox": [[int(c) for c in point] for point in bbox]
             })
 
         return segments
@@ -94,4 +126,4 @@ class OCRService:
     @staticmethod
     def segments_to_text(segments):
         """Convert OCR segments to plain text"""
-        return '\n'.join([seg['text'] for seg in segments])
+        return "  ".join(seg["text"] for seg in segments)
