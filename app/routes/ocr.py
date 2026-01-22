@@ -79,10 +79,10 @@ def single_image_ocr():
         raw_text = OCRService.segments_to_text(segments)
 
         # Process text
-        processor = TextProcessor(language='vi')
-        processed_text = processor.process(raw_text)
+        # processor = raw_text
+        processed_text = raw_text
 
-        bart_output = run_bart_model(processed_text)
+        # bart_output = run_bart_model(processed_text)
 
         # Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
@@ -102,7 +102,7 @@ def single_image_ocr():
             language='vi,en',
             raw_text=raw_text,
             processed_text=processed_text,
-            corrected_text=bart_output,
+            corrected_text=raw_text,
             confidence_avg=confidence_avg,
             processing_time_ms=processing_time_ms,
             word_count=len(processed_text.split()) if processed_text else 0,
@@ -140,7 +140,7 @@ def single_image_ocr():
             work_id=work.id,
             source_type='ocr',
             title='OCR Result',
-            content=bart_output or processed_text or raw_text,
+            content=processed_text or raw_text,
             position=0
         )
         db.session.add(text_block)
@@ -151,7 +151,7 @@ def single_image_ocr():
             'success': True,
             'raw_text': raw_text,
             'processed_text': processed_text,
-            'bart_output': bart_output,
+            'bart_output': raw_text,
             'segments': segments,
             'image_id': image.id,
             'ocr_result_id': ocr_result.id,

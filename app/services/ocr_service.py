@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image
 from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
-
+import torch
 
 _ocr_reader = None
 _vietocr_predictor = None
@@ -15,7 +15,9 @@ def init_ocr_reader(languages):
     Initialize OCR readers once at app startup
     """
     global _ocr_reader, _vietocr_predictor
-    GPU = True # or False
+    GPU = torch.cuda.is_available()
+    print(f"[OCR] GPU Available: {GPU}")
+    
     if _ocr_reader is None:
         _ocr_reader = easyocr.Reader(languages, gpu=GPU)
 
