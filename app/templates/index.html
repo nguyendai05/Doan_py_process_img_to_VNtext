@@ -6,7 +6,7 @@
     <div class="upload-section">
         <div id="upload-area" class="upload-area">
             <div class="upload-icon">📷</div>
-            <p>Kéo thả ảnh vào đây hoặc click để chọn</p>
+            <p>Kéo thả ảnh vào đây, click để chọn hoặc <strong>Ctrl+V</strong> để paste</p>
             <p class="upload-hint">Hỗ trợ: JPG, JPEG, PNG (tối đa 5MB)</p>
             <input type="file" id="file-input" accept=".jpg,.jpeg,.png" hidden>
         </div>
@@ -36,7 +36,10 @@
 
 <!-- Tools Panel -->
 <div id="tools-panel" class="tools-panel hidden">
-    <h4>🛠️ Công cụ xử lý</h4>
+    <div class="tools-panel-header">
+        <h4>🛠️ Công cụ xử lý</h4>
+        <button class="tools-panel-close" onclick="closeToolsPanel()" title="Đóng">&times;</button>
+    </div>
     <p class="selected-text-info">
         <span>📋</span> Đã chọn: <strong id="selected-char-count">0</strong> ký tự
     </p>

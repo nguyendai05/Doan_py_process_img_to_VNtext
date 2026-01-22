@@ -6,6 +6,7 @@ from app.services.translate_service import TranslateService
 from app.services.research_service import ResearchService
 
 from app.services.summarize_service import SummarizeService
+from app.services.model_inference import run_bart_model, model as bart_model
 
 tools_bp = Blueprint('tools', __name__)
 
@@ -197,7 +198,7 @@ def translate_all_by_model():
         }), 400
 
     try:
-        service = TranslationModelService(model_dir=r"D:\FinetuneWork\opus-vi-en-100k-final")
+        service = TranslationModelService(model_dir=r"D:\video\opus-vi-en-100k-final-20260122T171003Z-3-001\opus-vi-en-100k-final")
         result = service.translate(text)
 
         if result.get('success'):
@@ -243,3 +244,108 @@ def summarize_text():
     service = SummarizeService()
     result = service.summarize(text, algo=algo, debug=debug)
     return jsonify(result)
+
+
+# ==================== BART CORRECTION ====================
+@tools_bp.route('/bart-correction', methods=['POST'])
+@login_required
+def bart_correction():
+    """
+    Sửa lỗi chính tả bằng BARTpho model.
+    Request: { "text": "..." }
+    Response: original_text, corrected_text, evaluation stats
+    """
+    # Check if BART model is loaded
+    if bart_model is None:
+        return jsonify({
+            'success': False,
+            'error': 'BART model chưa được load. Vui lòng kiểm tra folder models/bartpho_correction_model/',
+            'error_code': 'MODEL_NOT_LOADED'
+        }), 503
+
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({
+            'success': False,
+            'error': 'No text provided',
+            'error_code': 'EMPTY_TEXT'
+        }), 400
+
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({
+            'success': False,
+            'error': 'Text is empty',
+            'error_code': 'EMPTY_TEXT'
+        }), 400
+
+    # Check text length
+    max_length = current_app.config.get('MAX_TEXT_LENGTH', 5000)
+    if len(text) > max_length:
+        return jsonify({
+            'success': False,
+            'error': f'Text too long. Max {max_length} characters',
+            'error_code': 'TEXT_TOO_LONG'
+        }), 400
+
+    try:
+        # Run BART correction
+        corrected_text = run_bart_model(text)
+
+        # Calculate evaluation metrics
+        original_words = text.split()
+        corrected_words = corrected_text.split()
+
+        # Count differences (simple word-level diff)
+        changes_count = 0
+        max_len = max(len(original_words), len(corrected_words))
+        for i in range(max_len):
+            orig = original_words[i] if i < len(original_words) else ''
+            corr = corrected_words[i] if i < len(corrected_words) else ''
+            if orig != corr:
+                changes_count += 1
+        
+        # Count sentences (simple split by . ! ?)
+        import re
+        original_sentences = len(re.split(r'[.!?]+', text.strip()))
+        corrected_sentences = len(re.split(r'[.!?]+', corrected_text.strip()))
+        
+        # Calculate change rate
+        change_rate = round((changes_count / max(len(original_words), 1)) * 100, 1)
+        
+        # Calculate character change
+        char_diff = len(corrected_text) - len(text)
+        char_change_percent = round((abs(char_diff) / max(len(text), 1)) * 100, 1)
+        
+        # Calculate similarity score (simple Jaccard-like)
+        orig_set = set(original_words)
+        corr_set = set(corrected_words)
+        intersection = len(orig_set & corr_set)
+        union = len(orig_set | corr_set)
+        similarity_score = round((intersection / max(union, 1)) * 100, 1)
+
+        return jsonify({
+            'success': True,
+            'original_text': text,
+            'corrected_text': corrected_text,
+            'evaluation': {
+                'original_char_count': len(text),
+                'corrected_char_count': len(corrected_text),
+                'char_diff': char_diff,
+                'char_change_percent': char_change_percent,
+                'original_word_count': len(original_words),
+                'corrected_word_count': len(corrected_words),
+                'original_sentence_count': original_sentences,
+                'corrected_sentence_count': corrected_sentences,
+                'changes_count': changes_count,
+                'change_rate': change_rate,
+                'similarity_score': similarity_score
+            }
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'error_code': 'CORRECTION_FAILED'
+        }), 500

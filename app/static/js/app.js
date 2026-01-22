@@ -73,7 +73,29 @@ document.addEventListener('DOMContentLoaded', () => {
     initUpload();
     initTools();
     loadWorks();
+    initModal();
 });
+
+/**
+ * Initialize modal behavior - prevent closing on outside click
+ */
+function initModal() {
+    // Prevent modal from closing when clicking on overlay (outside modal content)
+    // Modal can only be closed by clicking the close button
+    if (elements.modalOverlay) {
+        elements.modalOverlay.addEventListener('click', (e) => {
+            // Do nothing - modal stays open
+            e.stopPropagation();
+        });
+    }
+
+    // Prevent clicks inside modal content from bubbling
+    if (elements.modalContent) {
+        elements.modalContent.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    }
+}
 
 // Auth Functions
 function initAuth() {
@@ -261,6 +283,48 @@ function initUpload() {
     });
 
     elements.processBtn.addEventListener('click', processOCR);
+
+    // Paste image from clipboard (Ctrl+V)
+    document.addEventListener('paste', handlePaste);
+}
+
+/**
+ * Handle paste event for images from clipboard
+ */
+function handlePaste(e) {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData) return;
+
+    const items = clipboardData.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+
+        // Check if item is an image
+        if (item.type.indexOf('image') !== -1) {
+            e.preventDefault();
+
+            const file = item.getAsFile();
+            if (file) {
+                // Validate file type
+                if (['image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                    // Create a proper file name
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const extension = file.type.split('/')[1];
+                    const renamedFile = new File([file], `pasted_image_${timestamp}.${extension}`, { type: file.type });
+
+                    state.selectedFiles = [renamedFile];
+                    renderPreview();
+                    elements.processBtn.disabled = false;
+                    showToast('✅ Đã paste ảnh từ clipboard!', 'success');
+                } else {
+                    showToast('⚠️ Chỉ hỗ trợ ảnh JPG, PNG', 'warning');
+                }
+            }
+            return;
+        }
+    }
 }
 
 function handleFiles(files) {
@@ -373,7 +437,7 @@ function renderTextBlocks() {
                     <button class="btn-action" onclick="copyText(${block.id})" title="Copy">📋</button>
                     <button class="btn-action" onclick="downloadText(${block.id})" title="Tải xuống">⬇️</button>
                     <button class="btn-action" onclick="translateAllByModel()" title="Dịch tất cả (Model Vi→En)">🌐</button>
-                    <button class="btn-action" onclick="summarizeBlockByModel(${block.id})" title="Tóm tắt">📝</button>
+                    <button class="btn-action" onclick="runBartCorrection(${block.id})" title="Sửa lỗi bằng AI">🤖</button>
                     <button class="btn-action btn-delete" onclick="removeBlock(${block.id})" title="Xóa">🗑️</button>
                 </div>
             </div>
@@ -480,6 +544,15 @@ function handleTextSelect() {
         elements.toolsPanel.classList.add('hidden');
     }
 
+}
+
+/**
+ * Close the tools panel
+ */
+function closeToolsPanel() {
+    elements.toolsPanel.classList.add('hidden');
+    state.selectedText = '';
+    window.getSelection().removeAllRanges();
 }
 
 /**
@@ -951,7 +1024,7 @@ async function runTranslate(mode = 'google') {
     if (mode === 'model') {
         const ok = (translateState.destLang === 'en') &&
             (translateState.sourceLang === 'vi' ||
-             (translateState.sourceLang === 'auto' && isLikelyVietnamese(state.selectedText)));
+                (translateState.sourceLang === 'auto' && isLikelyVietnamese(state.selectedText)));
 
         if (!ok) {
             showToast('Model chỉ hỗ trợ dịch Tiếng Việt → English (Vi→En)', 'warning');
@@ -1318,14 +1391,14 @@ async function runResearch() {
                             </div>
                             <div class="keywords-grid">
                                 ${keywords.map((k, i) => {
-                                    const keyword = typeof k === 'object' ? k.keyword : k;
-                                    const score = typeof k === 'object' ? k.score : null;
-                                    const count = typeof k === 'object' ? k.count : null;
-                                    const pos = typeof k === 'object' ? k.pos : null;
+                        const keyword = typeof k === 'object' ? k.keyword : k;
+                        const score = typeof k === 'object' ? k.score : null;
+                        const count = typeof k === 'object' ? k.count : null;
+                        const pos = typeof k === 'object' ? k.pos : null;
 
-                                    const colorClass = i < 3 ? 'keyword-top' : (i < 6 ? 'keyword-mid' : 'keyword-low');
+                        const colorClass = i < 3 ? 'keyword-top' : (i < 6 ? 'keyword-mid' : 'keyword-low');
 
-                                    return `
+                        return `
                                         <div class="keyword-item ${colorClass}" title="POS: ${pos || 'N/A'}, Điểm: ${score || 'N/A'}">
                                             <span class="keyword-rank">#${i + 1}</span>
                                             <span class="keyword-text">${escapeHtml(keyword)}</span>
@@ -1333,7 +1406,7 @@ async function runResearch() {
                                             <button class="keyword-search-btn" onclick="searchKeyword('${escapeHtml(keyword).replace(/'/g, "\\'")}')">🔍</button>
                                         </div>
                                     `;
-                                }).join('')}
+                    }).join('')}
                             </div>
                             <div class="keywords-footer">
                                 <span class="keywords-method">Phương pháp: ${method === 'hybrid_vietnamese' ? 'Hybrid (POS + TF)' : 'Fallback'}</span>
@@ -1486,10 +1559,69 @@ function renderWorkList() {
     elements.workList.innerHTML = state.works.map(w => `
         <div class="work-item" onclick="loadWork(${w.id})">
             <button class="work-item-delete" onclick="event.stopPropagation(); deleteWork(${w.id})" title="Xóa">✕</button>
-            <div class="work-item-title">${w.title}</div>
+            <div class="work-item-title" ondblclick="event.stopPropagation(); editWorkTitle(${w.id}, this)" title="Double-click để sửa tên">${w.title}</div>
             <div class="work-item-meta">${w.block_count} blocks • ${new Date(w.created_at).toLocaleDateString('vi')}</div>
         </div>
     `).join('');
+}
+
+/**
+ * Edit work title inline
+ */
+function editWorkTitle(workId, titleElement) {
+    const currentTitle = titleElement.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentTitle;
+    input.className = 'work-title-input';
+    input.onclick = (e) => e.stopPropagation();
+
+    // Save on blur or Enter
+    const saveTitle = async () => {
+        const newTitle = input.value.trim();
+        if (newTitle && newTitle !== currentTitle) {
+            try {
+                const res = await fetch(`/api/works/${workId}/rename`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    // Update state
+                    const work = state.works.find(w => w.id === workId);
+                    if (work) work.title = newTitle;
+                    showToast('✅ Đã đổi tên thành công!', 'success');
+                } else {
+                    showToast('⚠️ Lỗi đổi tên: ' + (data.error || 'Unknown'), 'error');
+                }
+            } catch (e) {
+                showToast('⚠️ Lỗi kết nối', 'error');
+            }
+        }
+        // Replace input with title
+        titleElement.textContent = input.value.trim() || currentTitle;
+        titleElement.style.display = '';
+        input.remove();
+    };
+
+    input.onblur = saveTitle;
+    input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            titleElement.textContent = currentTitle;
+            titleElement.style.display = '';
+            input.remove();
+        }
+    };
+
+    // Hide original title and show input
+    titleElement.style.display = 'none';
+    titleElement.parentNode.insertBefore(input, titleElement);
+    input.focus();
+    input.select();
 }
 
 async function loadWork(id) {
@@ -1564,10 +1696,11 @@ function startNewProcess() {
     elements.toolsPanel.classList.add('hidden');
 }
 
-// Close modal on overlay click
-elements.modalOverlay.addEventListener('click', (e) => {
-    if (e.target === elements.modalOverlay) closeModal();
-});
+// Modal overlay click behavior - DISABLED to prevent accidental closing
+// To close modal, user must click the X button
+// elements.modalOverlay.addEventListener('click', (e) => {
+//     if (e.target === elements.modalOverlay) closeModal();
+// });
 
 let modelTranslateLastText = "";
 
@@ -1770,3 +1903,221 @@ function downloadModelSummaryResult() {
 
     URL.revokeObjectURL(url);
 }
+
+// ==================== BART CORRECTION ====================
+let bartCorrectionState = {
+    currentBlockId: null,
+    originalText: '',
+    correctedText: '',
+    evaluation: null
+};
+
+/**
+ * Run BART correction on a text block
+ */
+async function runBartCorrection(blockId) {
+    if (!state.user) {
+        alert('Vui lòng đăng nhập để sử dụng tính năng này');
+        showLoginModal();
+        return;
+    }
+
+    const block = state.textBlocks.find(b => b.id === blockId);
+    if (!block || !block.text.trim()) {
+        showToast('Không có văn bản để sửa lỗi', 'warning');
+        return;
+    }
+
+    // Store current block ID
+    bartCorrectionState.currentBlockId = blockId;
+    bartCorrectionState.originalText = block.text;
+
+    // Show loading modal
+    showResultModal('🤖 Sửa lỗi bằng AI', `
+        <div class="bart-loading">
+            <span class="loading-spinner">⏳</span>
+            <span class="loading-text">Đang phân tích và sửa lỗi bằng BARTpho...</span>
+        </div>
+    `);
+
+    try {
+        const res = await fetch('/api/tools/bart-correction', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: block.text })
+        });
+
+        const result = await res.json();
+
+        if (result.success) {
+            bartCorrectionState.correctedText = result.corrected_text;
+            bartCorrectionState.evaluation = result.evaluation;
+
+            showBartComparisonModal(result);
+        } else {
+            showResultModal('🤖 Sửa lỗi bằng AI', `
+                <div class="bart-error">
+                    <span class="error-icon">❌</span>
+                    <span class="error-message">${escapeHtml(result.error || 'Sửa lỗi thất bại')}</span>
+                </div>
+            `);
+        }
+    } catch (e) {
+        showResultModal('🤖 Sửa lỗi bằng AI', `
+            <div class="bart-error">
+                <span class="error-icon">❌</span>
+                <span class="error-message">Lỗi kết nối</span>
+            </div>
+        `);
+    }
+}
+
+/**
+ * Show BART comparison modal with original vs corrected text
+ */
+function showBartComparisonModal(result) {
+    const eval_data = result.evaluation || {};
+
+    // Determine quality color based on similarity
+    const similarity = eval_data.similarity_score || 0;
+    let qualityClass = 'quality-good';
+    let qualityLabel = '✅ Tốt';
+    if (similarity < 70) {
+        qualityClass = 'quality-warning';
+        qualityLabel = '⚠️ Thay đổi nhiều';
+    } else if (similarity < 50) {
+        qualityClass = 'quality-danger';
+        qualityLabel = '⛔ Thay đổi rất nhiều';
+    }
+
+    // Character diff display
+    const charDiff = eval_data.char_diff || 0;
+    const charDiffDisplay = charDiff > 0 ? `+${charDiff}` : charDiff.toString();
+    const charDiffClass = charDiff > 0 ? 'diff-increase' : (charDiff < 0 ? 'diff-decrease' : 'diff-neutral');
+
+    elements.modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3>🤖 Kết quả sửa lỗi AI</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="bart-comparison-body">
+            <!-- Quality Badge -->
+            <div class="bart-quality-badge ${qualityClass}">
+                ${qualityLabel} • Độ tương đồng: ${similarity}%
+            </div>
+            
+            <!-- Evaluation Stats Grid -->
+            <div class="bart-evaluation-grid">
+                <div class="eval-card">
+                    <div class="eval-card-icon">📝</div>
+                    <div class="eval-card-content">
+                        <div class="eval-card-label">Ký tự gốc</div>
+                        <div class="eval-card-value">${eval_data.original_char_count || 0}</div>
+                    </div>
+                </div>
+                <div class="eval-card">
+                    <div class="eval-card-icon">✅</div>
+                    <div class="eval-card-content">
+                        <div class="eval-card-label">Ký tự sau sửa</div>
+                        <div class="eval-card-value">
+                            ${eval_data.corrected_char_count || 0}
+                            <span class="eval-card-diff ${charDiffClass}">(${charDiffDisplay})</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="eval-card">
+                    <div class="eval-card-icon">📊</div>
+                    <div class="eval-card-content">
+                        <div class="eval-card-label">Từ gốc → Sau sửa</div>
+                        <div class="eval-card-value">${eval_data.original_word_count || 0} → ${eval_data.corrected_word_count || 0}</div>
+                    </div>
+                </div>
+                <div class="eval-card">
+                    <div class="eval-card-icon">📑</div>
+                    <div class="eval-card-content">
+                        <div class="eval-card-label">Số câu</div>
+                        <div class="eval-card-value">${eval_data.original_sentence_count || 0} → ${eval_data.corrected_sentence_count || 0}</div>
+                    </div>
+                </div>
+                <div class="eval-card highlight">
+                    <div class="eval-card-icon">🔄</div>
+                    <div class="eval-card-content">
+                        <div class="eval-card-label">Từ thay đổi</div>
+                        <div class="eval-card-value">${eval_data.changes_count || 0} <span class="eval-card-percent">(${eval_data.change_rate || 0}%)</span></div>
+                    </div>
+                </div>
+                <div class="eval-card">
+                    <div class="eval-card-icon">🎯</div>
+                    <div class="eval-card-content">
+                        <div class="eval-card-label">Độ tương đồng</div>
+                        <div class="eval-card-value similarity-bar">
+                            <div class="similarity-fill" style="width: ${similarity}%"></div>
+                            <span>${similarity}%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison View -->
+            <div class="bart-comparison-grid">
+                <div class="comparison-column">
+                    <h4>📄 Văn bản gốc</h4>
+                    <div class="comparison-text original">${escapeHtml(result.original_text || '')}</div>
+                </div>
+                <div class="comparison-column">
+                    <h4>✨ Văn bản đã sửa</h4>
+                    <div class="comparison-text corrected">${escapeHtml(result.corrected_text || '')}</div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="bart-actions">
+                <button class="btn btn-secondary" onclick="useBartOriginal()">
+                    📄 Giữ bản gốc
+                </button>
+                <button class="btn btn-primary" onclick="useBartCorrected()">
+                    ✨ Dùng bản đã sửa
+                </button>
+            </div>
+        </div>
+    `;
+
+    elements.modalOverlay.classList.remove('hidden');
+}
+
+/**
+ * Use original text (close modal without changes)
+ */
+function useBartOriginal() {
+    closeModal();
+    showToast('✅ Đã giữ nguyên bản gốc', 'info');
+    bartCorrectionState = { currentBlockId: null, originalText: '', correctedText: '', evaluation: null };
+}
+
+/**
+ * Use corrected text (update text block)
+ */
+function useBartCorrected() {
+    const blockId = bartCorrectionState.currentBlockId;
+    const correctedText = bartCorrectionState.correctedText;
+
+    if (blockId && correctedText) {
+        // Update state
+        const block = state.textBlocks.find(b => b.id === blockId);
+        if (block) {
+            block.text = correctedText;
+        }
+
+        // Update textarea in DOM
+        const textarea = document.querySelector(`textarea[data-id="${blockId}"]`);
+        if (textarea) {
+            textarea.value = correctedText;
+        }
+
+        showToast('✅ Đã áp dụng bản sửa lỗi!', 'success');
+    }
+
+    closeModal();
+    bartCorrectionState = { currentBlockId: null, originalText: '', correctedText: '', evaluation: null };
+}
+
