@@ -83,6 +83,31 @@ def update_work(work_id):
     })
 
 
+@work_bp.route('/<int:work_id>/rename', methods=['POST'])
+@login_required
+def rename_work(work_id):
+    """Rename work title"""
+    work = Work.query.filter_by(id=work_id, user_id=current_user.id).first()
+
+    if not work:
+        return jsonify({'success': False, 'error': 'Work not found'}), 404
+
+    data = request.get_json() or {}
+    new_title = data.get('title', '').strip()
+    
+    if not new_title:
+        return jsonify({'success': False, 'error': 'Title cannot be empty'}), 400
+    
+    work.title = new_title
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'message': 'Work renamed',
+        'work': work.to_dict()
+    })
+
+
 @work_bp.route('/<int:work_id>', methods=['DELETE'])
 @login_required
 def delete_work(work_id):

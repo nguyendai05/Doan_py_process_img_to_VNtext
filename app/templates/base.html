@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Python OCR - Nhận dạng văn bản{% endblock %}</title>
-    
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
+
 <body>
     <header class="header">
         <div class="header-left">
@@ -54,8 +56,8 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <div id="modal-overlay" class="modal-overlay hidden">
-        <div id="modal-content" class="modal-content">
+    <div id="modal-overlay" class="modal-overlay hidden" onclick="return false" onmousedown="event.stopPropagation()">
+        <div id="modal-content" class="modal-content" onclick="event.stopPropagation()">
             <!-- Modal content filled by JS -->
         </div>
     </div>
@@ -63,4 +65,5 @@
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </body>
+
 </html>
