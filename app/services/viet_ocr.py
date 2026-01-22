@@ -9,12 +9,18 @@ from vietocr.tool.config import Cfg
 # INIT MODELS
 # =========================
 
+import torch
+
+# Auto-detect GPU availability
+GPU_AVAILABLE = torch.cuda.is_available()
+print(f"[INFO] GPU Available: {GPU_AVAILABLE}")
+
 print("[INFO] Loading EasyOCR...")
-easy_reader = easyocr.Reader(['vi', 'en'], gpu=True)
+easy_reader = easyocr.Reader(['vi', 'en'], gpu=GPU_AVAILABLE)
 
 print("[INFO] Loading VietOCR...")
 config = Cfg.load_config_from_name("vgg_transformer")
-config['device'] = 'cuda'   # đổi 'cuda' nếu có GPU
+config['device'] = 'cuda' if GPU_AVAILABLE else 'cpu'
 vietocr = Predictor(config)
 
 print("[INFO] Models loaded successfully.")
