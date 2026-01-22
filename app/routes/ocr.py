@@ -17,7 +17,6 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extension
 
 
-
 @ocr_bp.route('/single', methods=['POST'])
 @login_required
 def single_image_ocr():
