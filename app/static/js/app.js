@@ -475,9 +475,11 @@ function handleTextSelect() {
         state.selectedText = text;
         updateCharacterCountDisplay(text.length);
         elements.toolsPanel.classList.remove('hidden');
+        updateModelTranslateButtonState();
     } else {
         elements.toolsPanel.classList.add('hidden');
     }
+
 }
 
 /**
@@ -575,7 +577,7 @@ function initTools() {
 
 function showTTSModal() {
     if (!state.selectedText) return;
-    
+
     // Build language options grid
     const languageOptions = TTS_LANGUAGES.map(lang => {
         const isSelected = lang.code === ttsState.lastUsedLanguage;
@@ -588,7 +590,7 @@ function showTTSModal() {
             </div>
         `;
     }).join('');
-    
+
     elements.modalContent.innerHTML = `
         <div class="modal-header">
             <h3>🔊 Text-to-Speech</h3>
@@ -609,7 +611,7 @@ function showTTSModal() {
         </div>
         <div id="tts-result" class="result-panel mt-2"></div>
     `;
-    
+
     // Set initial selected language
     ttsState.selectedLanguage = ttsState.lastUsedLanguage;
     elements.modalOverlay.classList.remove('hidden');
@@ -617,7 +619,7 @@ function showTTSModal() {
 
 function selectTTSLanguage(langCode) {
     ttsState.selectedLanguage = langCode;
-    
+
     // Update UI to show selected language
     document.querySelectorAll('.tts-language-option').forEach(el => {
         el.classList.remove('selected');
@@ -633,16 +635,16 @@ async function runTTS() {
 
     // Set generating state
     ttsState.isGenerating = true;
-    
+
     // Update UI to show loading state
     const generateBtn = document.getElementById('tts-generate-btn');
     const ttsToolBtn = document.querySelector('.tool-btn[data-tool="tts"]');
-    
+
     if (generateBtn) {
         generateBtn.disabled = true;
         generateBtn.innerHTML = '<span class="btn-text">⏳ Đang tạo audio...</span>';
     }
-    
+
     // Disable TTS button in tools panel
     if (ttsToolBtn) {
         ttsToolBtn.disabled = true;
@@ -659,17 +661,17 @@ async function runTTS() {
             })
         });
         const result = await res.json();
-        
+
         if (result.success) {
             // Save selected language to localStorage for next time
             localStorage.setItem('tts_language', ttsState.selectedLanguage);
             ttsState.lastUsedLanguage = ttsState.selectedLanguage;
-            
+
             // Show result in the TTS modal using renderAudioPlayer
             const ttsResultDiv = document.getElementById('tts-result');
             if (ttsResultDiv) {
                 ttsResultDiv.innerHTML = renderAudioPlayer(result.audio_url, result.from_cache);
-                
+
                 // Store audio reference for cleanup on modal close
                 const audioElement = document.getElementById('tts-audio-element');
                 if (audioElement) {
@@ -705,13 +707,13 @@ async function runTTS() {
     } finally {
         // Reset generating state
         ttsState.isGenerating = false;
-        
+
         // Re-enable buttons
         if (generateBtn) {
             generateBtn.disabled = false;
             generateBtn.innerHTML = '<span class="btn-text">🔊 Tạo Audio</span>';
         }
-        
+
         if (ttsToolBtn) {
             ttsToolBtn.disabled = false;
             ttsToolBtn.classList.remove('disabled');
@@ -725,7 +727,7 @@ async function runTTS() {
  */
 function showTranslateModal() {
     if (!state.selectedText) return;
-    
+
     // Build source language options grid (includes auto-detect)
     const sourceLanguageOptions = TRANSLATE_LANGUAGES.map(lang => {
         const isSelected = lang.code === translateState.sourceLang;
@@ -739,7 +741,7 @@ function showTranslateModal() {
             </div>
         `;
     }).join('');
-    
+
     // Build destination language options grid (excludes auto-detect)
     const destLanguageOptions = TRANSLATE_LANGUAGES
         .filter(lang => lang.code !== 'auto')
@@ -755,11 +757,11 @@ function showTranslateModal() {
                 </div>
             `;
         }).join('');
-    
+
     // Check if swap should be disabled (source is 'auto')
     const swapDisabled = translateState.sourceLang === 'auto';
     const swapTooltip = swapDisabled ? 'title="Không thể hoán đổi khi nguồn là Tự động phát hiện"' : '';
-    
+
     // Check if same language warning should be shown
     const showSameLangWarning = translateState.sourceLang !== 'auto' &&
         translateState.sourceLang === translateState.destLang;
@@ -777,7 +779,7 @@ function showTranslateModal() {
                         ${sourceLanguageOptions}
                     </div>
                 </div>
-                
+
                 <div class="translate-swap-section">
                     <button class="swap-lang-btn ${swapDisabled ? 'disabled' : ''}"
                             onclick="swapLanguages()"
@@ -786,7 +788,7 @@ function showTranslateModal() {
                         ⇄
                     </button>
                 </div>
-                
+
                 <div class="translate-lang-section">
                     <label class="translate-lang-label">Ngôn ngữ đích:</label>
                     <div class="translate-language-grid" id="dest-lang-grid">
@@ -794,23 +796,28 @@ function showTranslateModal() {
                     </div>
                 </div>
             </div>
-            
+
             <div id="same-lang-warning" class="same-lang-warning ${showSameLangWarning ? '' : 'hidden'}">
                 ⚠️ Ngôn ngữ nguồn và đích giống nhau. Vui lòng chọn ngôn ngữ khác.
             </div>
-            
+
             <div class="translate-selected-text-preview">
                 <label>Văn bản đã chọn (${state.selectedText.length} ký tự):</label>
                 <div class="text-preview">${state.selectedText.substring(0, 150)}${state.selectedText.length > 150 ? '...' : ''}</div>
             </div>
-            
+
             <button class="btn btn-primary translate-btn" id="translate-btn" onclick="runTranslate()" ${showSameLangWarning ? 'disabled' : ''}>
                 <span class="btn-text">🌐 Dịch</span>
             </button>
+            <button class="btn btn-secondary translate-btn" id="translate-model-btn" onclick="runTranslate('model')" disabled>
+                <span class="btn-text">🤖 Dịch bằng Model (Vi→En)</span>
+            </button>
+
         </div>
         <div id="translate-result" class="result-panel mt-2"></div>
     `;
     elements.modalOverlay.classList.remove('hidden');
+    updateModelTranslateButtonState();
 }
 
 /**
@@ -820,7 +827,7 @@ function showTranslateModal() {
  */
 function selectSourceLang(langCode) {
     translateState.sourceLang = langCode;
-    
+
     // Update UI to show selected source language
     document.querySelectorAll('#source-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -828,7 +835,7 @@ function selectSourceLang(langCode) {
             el.classList.add('selected');
         }
     });
-    
+
     // Update swap button state (disabled if source is 'auto')
     const swapBtn = document.querySelector('.swap-lang-btn');
     if (swapBtn) {
@@ -842,9 +849,10 @@ function selectSourceLang(langCode) {
             swapBtn.title = '';
         }
     }
-    
+
     // Update same language warning
     updateSameLangWarning();
+    updateModelTranslateButtonState();
 }
 
 /**
@@ -854,7 +862,7 @@ function selectSourceLang(langCode) {
  */
 function selectDestLang(langCode) {
     translateState.destLang = langCode;
-    
+
     // Update UI to show selected destination language
     document.querySelectorAll('#dest-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -862,9 +870,10 @@ function selectDestLang(langCode) {
             el.classList.add('selected');
         }
     });
-    
+
     // Update same language warning
     updateSameLangWarning();
+    updateModelTranslateButtonState();
 }
 
 /**
@@ -877,12 +886,12 @@ function swapLanguages() {
     if (translateState.sourceLang === 'auto') {
         return;
     }
-    
+
     // Swap the languages
     const tempLang = translateState.sourceLang;
     translateState.sourceLang = translateState.destLang;
     translateState.destLang = tempLang;
-    
+
     // Update source language UI
     document.querySelectorAll('#source-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -890,7 +899,7 @@ function swapLanguages() {
             el.classList.add('selected');
         }
     });
-    
+
     // Update destination language UI
     document.querySelectorAll('#dest-lang-grid .translate-lang-option').forEach(el => {
         el.classList.remove('selected');
@@ -898,9 +907,10 @@ function swapLanguages() {
             el.classList.add('selected');
         }
     });
-    
+
     // Update same language warning (should be same after swap)
     updateSameLangWarning();
+    updateModelTranslateButtonState();
 }
 
 /**
@@ -910,7 +920,7 @@ function swapLanguages() {
 function updateSameLangWarning() {
     const warningEl = document.getElementById('same-lang-warning');
     const translateBtn = document.getElementById('translate-btn');
-    
+
     // Show warning if source (not auto) equals destination
     const showWarning = translateState.sourceLang !== 'auto' &&
         translateState.sourceLang === translateState.destLang;
@@ -922,7 +932,7 @@ function updateSameLangWarning() {
             warningEl.classList.add('hidden');
         }
     }
-    
+
     // Disable translate button if same language
     if (translateBtn) {
         translateBtn.disabled = showWarning;
@@ -933,75 +943,117 @@ function updateSameLangWarning() {
  * Run translation with loading state and caching support
  * Requirements: 2.1, 2.2, 1.4
  */
-async function runTranslate() {
+async function runTranslate(mode = 'google') {
     if (!state.selectedText) return;
     if (translateState.isTranslating) return;
-    
-    // Get language pair from translateState
+
+    // Chặn chắc ở client cho mode model
+    if (mode === 'model') {
+        const ok = (translateState.destLang === 'en') &&
+            (translateState.sourceLang === 'vi' ||
+             (translateState.sourceLang === 'auto' && isLikelyVietnamese(state.selectedText)));
+
+        if (!ok) {
+            showToast('Model chỉ hỗ trợ dịch Tiếng Việt → English (Vi→En)', 'warning');
+            updateModelTranslateButtonState();
+            return;
+        }
+    }
+
     const sourceLang = translateState.sourceLang;
     const destLang = translateState.destLang;
-    
-    // Set translating state
+
     translateState.isTranslating = true;
-    
-    // Update UI to show loading state - Requirements: 2.1
+
     const translateBtn = document.getElementById('translate-btn');
+    const modelBtn = document.getElementById('translate-model-btn');
     const translateToolBtn = document.querySelector('.tool-btn[data-tool="translate"]');
     const translateResultDiv = document.getElementById('translate-result');
 
+    // Loading state
     if (translateBtn) {
         translateBtn.disabled = true;
         translateBtn.innerHTML = '<span class="btn-text">⏳ Đang dịch...</span>';
     }
-
-    // Disable Translate button in tools panel - Requirements: 2.2
+    if (modelBtn) {
+        modelBtn.disabled = true;
+    }
     if (translateToolBtn) {
         translateToolBtn.disabled = true;
         translateToolBtn.classList.add('disabled');
     }
-
-    // Show loading indicator in result area
     if (translateResultDiv) {
         translateResultDiv.innerHTML = `
             <div class="translate-loading">
                 <span class="loading-spinner">⏳</span>
-                <span class="loading-text">Đang dịch văn bản...</span>
+                <span class="loading-text">${mode === 'model' ? 'Đang dịch bằng model (Vi→En)...' : 'Đang dịch văn bản...'}</span>
             </div>
         `;
     }
 
     try {
-        const res = await fetch('/api/tools/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: state.selectedText,
-                dest_lang: destLang,
-                src_lang: sourceLang
-            })
-        });
-        const result = await res.json();
+        let res, result;
 
-        if (result.success) {
-            // Save language pair to localStorage after success - Requirements: 1.4
-            localStorage.setItem('translate_source_lang', sourceLang);
-            localStorage.setItem('translate_dest_lang', destLang);
+        if (mode === 'model') {
+            // MODEL Vi->En
+            res = await fetch('/api/tools/translate-model-all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: state.selectedText })
+            });
 
-            // Store last result
-            translateState.lastResult = result;
+            result = await res.json();
 
-            // Render translation result - Requirements: 2.3
-            if (translateResultDiv) {
-                translateResultDiv.innerHTML = renderTranslationResult(result);
+            if (res.ok && result.success) {
+                // Chuẩn hoá để dùng lại UI hiện tại
+                const normalized = {
+                    translated_text: result.translated_text || '',
+                    source_lang: 'vi',
+                    dest_lang: 'en',
+                    from_cache: false
+                };
+
+                translateState.lastResult = normalized;
+                if (translateResultDiv) {
+                    translateResultDiv.innerHTML = renderTranslationResult(normalized);
+                }
+            } else {
+                if (translateResultDiv) {
+                    translateResultDiv.innerHTML = renderTranslationError({
+                        error: result.error || 'Dịch bằng model thất bại',
+                        error_code: result.error_code || 'TRANSLATION_FAILED'
+                    });
+                }
             }
         } else {
-            // Handle error response - Requirements: 2.4
-            if (translateResultDiv) {
-                translateResultDiv.innerHTML = renderTranslationError(result);
+            // GOOGLE translate như cũ
+            res = await fetch('/api/tools/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: state.selectedText,
+                    dest_lang: destLang,
+                    src_lang: sourceLang
+                })
+            });
+
+            result = await res.json();
+
+            if (result.success) {
+                localStorage.setItem('translate_source_lang', sourceLang);
+                localStorage.setItem('translate_dest_lang', destLang);
+
+                translateState.lastResult = result;
+                if (translateResultDiv) {
+                    translateResultDiv.innerHTML = renderTranslationResult(result);
+                }
+            } else {
+                if (translateResultDiv) {
+                    translateResultDiv.innerHTML = renderTranslationError(result);
+                }
             }
         }
     } catch (e) {
-        // Handle network error - Requirements: 2.4
         if (translateResultDiv) {
             translateResultDiv.innerHTML = renderTranslationError({
                 error: 'Lỗi kết nối. Vui lòng thử lại.',
@@ -1009,19 +1061,66 @@ async function runTranslate() {
             });
         }
     } finally {
-        // Reset translating state
         translateState.isTranslating = false;
 
-        // Re-enable buttons
+        // Restore nút Dịch thường (same language rule vẫn giữ)
         if (translateBtn) {
-            translateBtn.disabled = false;
+            const sameLang = translateState.sourceLang !== 'auto' &&
+                translateState.sourceLang === translateState.destLang;
+
+            translateBtn.disabled = sameLang;
             translateBtn.innerHTML = '<span class="btn-text">🌐 Dịch</span>';
         }
 
+        // Restore tool button
         if (translateToolBtn) {
             translateToolBtn.disabled = false;
             translateToolBtn.classList.remove('disabled');
         }
+
+        // Update lại trạng thái nút model theo rule vi->en/auto-viet
+        updateModelTranslateButtonState();
+    }
+}
+
+function isLikelyVietnamese(text) {
+    const s = (text || '').trim();
+    if (!s) return false;
+
+    // Có dấu tiếng Việt hoặc ký tự đặc trưng
+    const vietChars = /[àáảãạăắằẳẵặâấầẩẫậđèéẻẽẹêếềểễệìíỉĩịòóỏõọôốồổỗộơớờởỡợùúủũụưứừửữựỳýỷỹỵđ]/i;
+    if (vietChars.test(s)) return true;
+
+    // Fallback đoán bằng vài từ common (không dấu)
+    const commonWords = /\b(tôi|toi|ban|bạn|chung|chúng|khong|không|va|và|la|là|cua|của|cho|mot|một|nhung|những|duoc|được|vui|long|lòng|xin|kinh|kính|gui|gửi)\b/i;
+    return commonWords.test(s);
+}
+
+function updateModelTranslateButtonState() {
+    const btn = document.getElementById('translate-model-btn');
+    if (!btn) return;
+
+    const src = translateState.sourceLang; // 'auto' | 'vi' | ...
+    const dst = translateState.destLang;   // 'en' | ...
+
+    let enabled = false;
+
+    // Model cố định Vi -> En
+    if (dst === 'en') {
+        if (src === 'vi') enabled = true;
+        else if (src === 'auto') enabled = isLikelyVietnamese(state.selectedText);
+        else enabled = false;
+    }
+
+    btn.disabled = !enabled;
+
+    // Tooltip rõ ràng
+    if (!enabled) {
+        if (dst !== 'en') btn.title = 'Model chỉ hỗ trợ đích là English (en)';
+        else if (src !== 'vi' && src !== 'auto') btn.title = 'Model chỉ hỗ trợ nguồn là Tiếng Việt (vi)';
+        else btn.title = 'Model chỉ bật khi phát hiện văn bản có vẻ là Tiếng Việt';
+    } else {
+        btn.title = 'Dịch bằng Model (Vi→En)';
     }
 }
 
@@ -1173,71 +1272,93 @@ async function runResearch() {
     }
 
     try {
-        const res = await fetch('/api/tools/research', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: state.selectedText, type })
-        });
-        const result = await res.json();
+        let res, result;
 
-        let html = '';
+        if (type === 'summary') {
+            // ✅ TÓM TẮT: dùng model summarize service
+            res = await fetch('/api/tools/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: state.selectedText,
+                    debug: false
+                })
+            });
+            result = await res.json();
 
-        if (type === 'keywords' && result.success) {
-            // Enhanced keywords display with scores
-            const keywords = result.result || [];
-            const processingTime = result.processing_time_ms || 0;
-            const method = result.method || 'unknown';
-
-            if (keywords.length > 0) {
-                html = `
-                    <div class="keywords-result">
-                        <div class="keywords-header">
-                            <span class="keywords-count">🔑 ${keywords.length} từ khóa</span>
-                            <span class="keywords-time">⚡ ${processingTime}ms</span>
-                        </div>
-                        <div class="keywords-grid">
-                            ${keywords.map((k, i) => {
-                    const keyword = typeof k === 'object' ? k.keyword : k;
-                    const score = typeof k === 'object' ? k.score : null;
-                    const count = typeof k === 'object' ? k.count : null;
-                    const pos = typeof k === 'object' ? k.pos : null;
-
-                    // Color based on ranking
-                    const colorClass = i < 3 ? 'keyword-top' : (i < 6 ? 'keyword-mid' : 'keyword-low');
-
-                    return `
-                                    <div class="keyword-item ${colorClass}" title="POS: ${pos || 'N/A'}, Điểm: ${score || 'N/A'}">
-                                        <span class="keyword-rank">#${i + 1}</span>
-                                        <span class="keyword-text">${escapeHtml(keyword)}</span>
-                                        ${count ? `<span class="keyword-count">×${count}</span>` : ''}
-                                        <button class="keyword-search-btn" onclick="searchKeyword('${escapeHtml(keyword).replace(/'/g, "\\'")}')">🔍</button>
-                                    </div>
-                                `;
-                }).join('')}
-                        </div>
-                        <div class="keywords-footer">
-                            <span class="keywords-method">Phương pháp: ${method === 'hybrid_vietnamese' ? 'Hybrid (POS + TF)' : 'Fallback'}</span>
-                        </div>
-                    </div>
-                `;
+            if (res.ok && result.success) {
+                // render giống summary text
+                resultDiv.innerHTML = `<div class="research-text">${escapeHtml(result.result || '')}</div>`;
             } else {
-                html = '<div class="research-empty">Không tìm thấy từ khóa nào.</div>';
+                resultDiv.innerHTML = `<div class="research-error">❌ ${escapeHtml(result.error || 'Tóm tắt thất bại')}</div>`;
             }
-        } else if (Array.isArray(result.result)) {
-            // Questions or other array results
-            html = '<ul class="research-list">' + result.result.map(r => `<li>${escapeHtml(typeof r === 'object' ? r.keyword || JSON.stringify(r) : r)}</li>`).join('') + '</ul>';
-        } else if (result.result) {
-            // Summary or text result
-            html = `<div class="research-text">${escapeHtml(result.result)}</div>`;
-        } else if (result.error) {
-            html = `<div class="research-error">❌ ${escapeHtml(result.error)}</div>`;
+
+        } else {
+            // ✅ TỪ KHÓA: vẫn dùng research như cũ
+            res = await fetch('/api/tools/research', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: state.selectedText, type })
+            });
+            result = await res.json();
+
+            let html = '';
+
+            if (type === 'keywords' && result.success) {
+                const keywords = result.result || [];
+                const processingTime = result.processing_time_ms || 0;
+                const method = result.method || 'unknown';
+
+                if (keywords.length > 0) {
+                    html = `
+                        <div class="keywords-result">
+                            <div class="keywords-header">
+                                <span class="keywords-count">🔑 ${keywords.length} từ khóa</span>
+                                <span class="keywords-time">⚡ ${processingTime}ms</span>
+                            </div>
+                            <div class="keywords-grid">
+                                ${keywords.map((k, i) => {
+                                    const keyword = typeof k === 'object' ? k.keyword : k;
+                                    const score = typeof k === 'object' ? k.score : null;
+                                    const count = typeof k === 'object' ? k.count : null;
+                                    const pos = typeof k === 'object' ? k.pos : null;
+
+                                    const colorClass = i < 3 ? 'keyword-top' : (i < 6 ? 'keyword-mid' : 'keyword-low');
+
+                                    return `
+                                        <div class="keyword-item ${colorClass}" title="POS: ${pos || 'N/A'}, Điểm: ${score || 'N/A'}">
+                                            <span class="keyword-rank">#${i + 1}</span>
+                                            <span class="keyword-text">${escapeHtml(keyword)}</span>
+                                            ${count ? `<span class="keyword-count">×${count}</span>` : ''}
+                                            <button class="keyword-search-btn" onclick="searchKeyword('${escapeHtml(keyword).replace(/'/g, "\\'")}')">🔍</button>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                            <div class="keywords-footer">
+                                <span class="keywords-method">Phương pháp: ${method === 'hybrid_vietnamese' ? 'Hybrid (POS + TF)' : 'Fallback'}</span>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html = '<div class="research-empty">Không tìm thấy từ khóa nào.</div>';
+                }
+            } else if (Array.isArray(result.result)) {
+                html = '<ul class="research-list">' +
+                    result.result.map(r => `<li>${escapeHtml(typeof r === 'object' ? r.keyword || JSON.stringify(r) : r)}</li>`).join('') +
+                    '</ul>';
+            } else if (result.result) {
+                html = `<div class="research-text">${escapeHtml(result.result)}</div>`;
+            } else if (result.error) {
+                html = `<div class="research-error">❌ ${escapeHtml(result.error)}</div>`;
+            }
+
+            resultDiv.innerHTML = html;
         }
 
-        resultDiv.innerHTML = html;
     } catch (e) {
         resultDiv.innerHTML = '<div class="research-error">❌ Lỗi kết nối. Vui lòng thử lại.</div>';
     } finally {
-        // Reset button state
         if (researchBtn) {
             researchBtn.disabled = false;
             researchBtn.innerHTML = '<span class="btn-text">🔍 Phân tích</span>';
@@ -1435,10 +1556,10 @@ function startNewProcess() {
             <p>Tải ảnh lên và nhấn "Xử lý OCR" để bắt đầu</p>
         </div>
     `;
-    
+
     // Remove active state from work items
     document.querySelectorAll('.work-item').forEach(el => el.classList.remove('active'));
-    
+
     // Hide tools panel
     elements.toolsPanel.classList.add('hidden');
 }

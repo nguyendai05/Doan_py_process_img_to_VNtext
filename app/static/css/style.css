@@ -1958,3 +1958,7 @@ textarea.text-block-content.editable:focus {
 .keyword-item:hover .keyword-search-btn {
     opacity: 1;
 }
+#translate-model-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}

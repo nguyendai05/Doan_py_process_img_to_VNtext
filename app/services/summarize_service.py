@@ -31,6 +31,7 @@ class Unit:  # đơn vị ý (mệnh đề/cụm ý)  # noqa
     pos: List[str]  # POS theo token gốc  # noqa
     ner: List[str]  # NER theo token gốc  # noqa
     nps: List[str]  # noun phrases  # noqa
+    raw_tokens: List[str]
 
 
 class SummarizeService:
@@ -48,7 +49,7 @@ class SummarizeService:
 
     # ====== Config mặc định (bạn có thể chỉnh) ======
     MIN_BULLETS = 3  # tối thiểu 3 ý  # noqa
-    RATIO = 0.30  # ~30%  # noqa
+    RATIO = 0.40  # ~40%  # noqa
     MAX_BULLETS = 12  # chặn quá dài  # noqa
 
     # ---------- Public API (route gọi y như cũ) ----------
@@ -102,9 +103,16 @@ class SummarizeService:
         # Vá OCR: "blue-\nchips" -> "blue-chips" (giữ dấu - đúng)  # noqa
         text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1-\2", text)  # noqa
 
-        # Gộp newline đơn lẻ -> space (OCR hay xuống dòng giữa câu)  # noqa
-        # Giữ double newline để còn paragraph boundary  # noqa
-        text = re.sub(r"(?<!\n)\n(?!\n)", " ", text)  # noqa
+        def _keep_list_newline(m):
+            # m.group(1) là ký tự ngay sau newline
+            nxt = m.group(1)
+            # nếu sau newline là bullet/list-number => giữ newline
+            if re.match(r"\s*(?:[-•*]|\d+[.)])\s+", nxt):
+                return "\n" + nxt
+            # còn lại: OCR xuống dòng giữa câu => gộp thành space
+            return " " + nxt
+
+        text = re.sub(r"\n([^\n])", _keep_list_newline, text)
 
         # Chuẩn hoá khoảng trắng  # noqa
         text = re.sub(r"[ \t]+", " ", text)  # noqa
@@ -147,7 +155,7 @@ class SummarizeService:
         - Không tách theo '-' để tránh phá VN-Index / blue-chips.
         - Nếu chunk quá dài, tách thêm theo marker (lookahead giữ marker).
         """
-        punct_split = re.compile(r"(?<!\d),(?!\d)|[;:]", flags=re.IGNORECASE)  # phẩy không kẹp số  # noqa
+        punct_split = re.compile(r"(?<!\d),(?!\d)|[;:]|[–—]", flags=re.IGNORECASE)
         marker_split = re.compile(  # marker diễn ngôn mạnh  # noqa
             r"(?=\b(?:nhưng|tuy nhiên|do đó|vì vậy|từ đó|dẫn đến|ngoài ra|đồng thời|mặt khác)\b)",  # noqa
             flags=re.IGNORECASE  # noqa
@@ -172,8 +180,10 @@ class SummarizeService:
                     subs = [c]  # giữ 1  # noqa
 
                 for u in subs:  # duyệt unit  # noqa
-                    if len(u) < 20:  # quá ngắn -> bỏ (tránh rác kiểu "3,62%")  # noqa
-                        continue  # noqa
+                    short_ok = bool(re.search(r"(\d|%|/|-|:)", u))  # có số / % / date-time / code
+                    if len(u) < 20 and not short_ok:
+                        continue
+
                     out.append((s, u))  # add unit  # noqa
 
         if not out:  # fallback nếu split fail  # noqa
@@ -246,7 +256,8 @@ class SummarizeService:
                 tokens=tokens_norm,  # tokens  # noqa
                 pos=pos_list,  # pos  # noqa
                 ner=ner_list,  # ner  # noqa
-                nps=nps  # noun phrases  # noqa
+                nps=nps ,# noun phrases  # noqa
+                raw_tokens=raw_tokens
             ))  # noqa
 
         return units  # noqa
@@ -312,11 +323,14 @@ class SummarizeService:
     # Step 3: TF-IDF + Similarity
     # =========================
     def _tfidf_and_sim(self, units: List[Unit]):
-        docs = [" ".join(u.tokens) for u in units]  # unit -> doc  # noqa
-        vec = TfidfVectorizer(ngram_range=(1, 2), min_df=1)  # 1-2gram  # noqa
-        tfidf = vec.fit_transform(docs)  # sparse  # noqa
-        sim = cosine_similarity(tfidf)  # NxN  # noqa
-        return vec, tfidf, sim  # noqa
+        docs = [" ".join(u.tokens).strip() for u in units]
+        if not any(docs):
+            docs = [(u.text or "").strip() for u in units]
+
+        vec = TfidfVectorizer(ngram_range=(1, 2), min_df=1)
+        tfidf = vec.fit_transform(docs)
+        sim = cosine_similarity(tfidf)
+        return vec, tfidf, sim
 
     # =========================
     # Step 4: TextRank (networkx)
@@ -350,11 +364,11 @@ class SummarizeService:
         for u in units:  # noqa
             phrases.extend(u.nps)  # noqa
 
-        # 2) Entity token  # noqa
-        for u in units:  # noqa
-            for w, t in zip(u.tokens, u.ner):  # noqa
-                if t and t != "O":  # noqa
-                    phrases.append(w)  # noqa
+        # 2) Entity token
+        for u in units:
+            for w, t in zip(u.raw_tokens, u.ner):
+                if t and t != "O":
+                    phrases.append(w)
 
         # 3) Top TF-IDF terms toàn đoạn  # noqa
         try:

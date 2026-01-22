@@ -64,15 +64,14 @@ class TranslationModelService:
     def _clean_keep_format(self, text: str) -> str:
         s = (text or "").replace("\r\n", "\n")
 
-        # keep newlines; normalize spaces per line
         lines = s.splitlines()
         lines = [re.sub(r"[ \t]+", " ", ln).rstrip() for ln in lines]
         s = "\n".join(lines)
 
-        # remove space before punctuation
-        s = re.sub(r" +([.,;:!?])", r"\1", s)
+        # CHỈ xóa space trước dấu câu TIẾNG ANH (không ảnh hưởng email/number)
+        # Chỉ xử lý khi có ký tự word trước space
+        s = re.sub(r"(\w) +([.,;:!?])", r"\1\2", s)
 
-        # max 2 blank lines
         s = re.sub(r"\n{3,}", "\n\n", s)
 
         return s.strip()
@@ -90,7 +89,7 @@ class TranslationModelService:
         seps: List[str] = []
 
         def is_end_punct(ch: str) -> bool:
-            return ch in ".!?:…"
+            return ch in ".!?…"
 
         i = 0
         n = len(s)
@@ -184,15 +183,16 @@ class TranslationModelService:
     def _find_entities_spans(self, s: str) -> List[Tuple[int, int, str, str]]:
 
         patterns = [
-            ("NL",    r"\n+"),
-            ("URL",   r"(https?://\S+|www\.\S+)"),
+            ("NL", r"\n+"),
+            ("URL", r"(https?://[^\s<>()\]\}]+|www\.[^\s<>()\]\}]+)"),
             ("EMAIL", r"[\w.\-]+@[\w.\-]+\.\w+"),
             ("DATE1", r"\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b"),                   # 2022-04-19
             ("DATE2", r"\b\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?\b"),            # 19/04/2022 or 2/9
             ("DATE3", r"\bngày\s+\d{1,2}\s+tháng\s+\d{1,2}\s+năm\s+\d{4}\b"),# ngày ... tháng ... năm ...
             ("TIME1", r"\b\d{1,2}:\d{2}(?::\d{2})?\b"),                      # 12:30:10
             ("TIME2", r"\b\d{1,2}\s*giờ(?:\s*\d{1,2}\s*phút)?\b"),           # 8 giờ 15 phút
-            ("NUM",   r"\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?%?\b"),           # 1.250.000, 12,5%, 80%
+            ("NUM",   r"\b\d{1,3}(?:[.,]\d{3})*(?:[.,]\d+)?%?\b"),
+            ("CODE", r"\b[A-Za-z]{1,10}-\d+(?:-\d+)*\b"),            # 1.250.000, 12,5%, 80%
         ]
 
         cands: List[Tuple[int, int, str, str]] = []
@@ -328,32 +328,36 @@ class TranslationModelService:
         return False
 
     def _merge_segments_entities(
-        self,
-        segs_tr: List[str],
-        entities: List[str],
-        glue: List[Tuple[bool, bool]],
+            self,
+            segs_tr: List[str],
+            entities: List[str],
+            glue: List[Tuple[bool, bool]],
     ) -> str:
         out: List[str] = []
 
         for i in range(len(entities)):
             left = segs_tr[i] or ""
             ent = entities[i] or ""
-            right = segs_tr[i + 1] or ""
             had_before, had_after = glue[i]
 
             out.append(left)
 
-            # before entity
-            if had_before or self._needs_space(left, ent):
-                if out and out[-1] and not out[-1].endswith((" ", "\n", "\t")):
+            # BEFORE entity - chỉ thêm space nếu THỰC SỰ cần
+            if had_before:
+                if left and not left.endswith((" ", "\n", "\t")):
                     out.append(" ")
+            elif self._needs_space(left, ent) and left:
+                out.append(" ")
 
             out.append(ent)
 
-            # after entity (avoid duplicating if right already begins with whitespace/newline)
-            if had_after or self._needs_space(ent, right):
-                if right and not right.startswith((" ", "\n", "\t")):
+            # AFTER entity
+            right = segs_tr[i + 1] or ""
+            if had_after:
+                if ent and not ent.endswith((" ", "\n", "\t")) and right and not right.startswith((" ", "\n", "\t")):
                     out.append(" ")
+            elif self._needs_space(ent, right) and ent and right:
+                out.append(" ")
 
         out.append(segs_tr[-1] or "")
         return "".join(out)
