@@ -3,14 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Python OCR{% endblock %}</title>
+    <title>{% block title %}Python OCR - Nhận dạng văn bản{% endblock %}</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     <header class="header">
         <div class="header-left">
-            <a href="/" class="logo">🔍 Python OCR</a>
+            <a href="/" class="logo">
+                <span class="logo-icon">🔍</span>
+                Python OCR
+            </a>
         </div>
         <div class="header-right">
             <div id="auth-section">
@@ -21,9 +30,19 @@
 
     <main class="main-container">
         <aside class="sidebar" id="sidebar">
-            <h3>📁 Work History</h3>
+            <div class="sidebar-header">
+                <h3>📁 Lịch sử xử lý</h3>
+                <button class="btn-new" onclick="startNewProcess()">
+                    <span>➕</span> New
+                </button>
+            </div>
             <div id="work-list" class="work-list">
                 <!-- Filled by JS -->
+                <div class="empty-state" id="empty-history">
+                    <div class="empty-state-icon">📭</div>
+                    <h4>Chưa có lịch sử</h4>
+                    <p>Tải ảnh lên để bắt đầu</p>
+                </div>
             </div>
         </aside>
 
@@ -31,6 +50,9 @@
             {% block content %}{% endblock %}
         </section>
     </main>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toast-container"></div>
 
     <div id="modal-overlay" class="modal-overlay hidden">
         <div id="modal-content" class="modal-content">

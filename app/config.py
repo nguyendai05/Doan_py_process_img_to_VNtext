@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 load_dotenv()
 
@@ -13,7 +14,7 @@ class Config:
     DB_PORT = os.getenv('DB_PORT', '3306')
     DB_NAME = os.getenv('DB_NAME', 'doan_ocr')
     DB_USER = os.getenv('DB_USER', 'root')
-    DB_PASSWORD = os.getenv('DB_PASSWORD', 'kjm03459119479dp@')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', '')
     
     # Use SQLite for quick dev, set USE_SQLITE=false in .env for MySQL
     USE_SQLITE = os.getenv('USE_SQLITE', 'true').lower() == 'true'
@@ -21,7 +22,9 @@ class Config:
     if USE_SQLITE:
         SQLALCHEMY_DATABASE_URI = 'sqlite:///app.db'
     else:
-        SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+        # URL encode password to handle special characters like @
+        encoded_password = quote_plus(DB_PASSWORD)
+        SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{DB_USER}:{encoded_password}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Upload

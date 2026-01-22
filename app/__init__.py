@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -15,6 +16,10 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
+    # Ensure TTS output folder exists
+    tts_folder = app.config.get('TTS_OUTPUT_FOLDER', 'app/static/audio')
+    os.makedirs(tts_folder, exist_ok=True)
+
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
@@ -30,20 +35,14 @@ def create_app(config_class=Config):
     from app.routes.ocr import ocr_bp
     from app.routes.work import work_bp
     from app.routes.tools import tools_bp
+    from app.routes.chat import chat_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(ocr_bp, url_prefix='/api/ocr')
     app.register_blueprint(work_bp, url_prefix='/api/works')
     app.register_blueprint(tools_bp, url_prefix='/api/tools')
+    app.register_blueprint(chat_bp, url_prefix='/api/chat')
 
-    print("👉 DB URI:", app.config['SQLALCHEMY_DATABASE_URI'])
-    from sqlalchemy import text
-    with app.app_context():
-        try:
-            db.session.execute(text("SELECT 1"))
-            print("✅ Database connection OK")
-        except Exception as e:
-            print("❌ Database connection FAILED:", e)
     # Create database tables
     with app.app_context():
         db.create_all()
