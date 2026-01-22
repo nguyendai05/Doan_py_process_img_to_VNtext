@@ -237,8 +237,8 @@ def summarize_text():
             'error_code': 'TEXT_TOO_LONG'
         }), 400
 
-    algo = data.get('algo', 'heuristic7')   # heuristic7 | textrank
-    debug = bool(data.get('debug', True))
+    algo = data.get('algo', 'heuristic7')
+    debug = bool(data.get('debug', False))
 
     service = SummarizeService()
     result = service.summarize(text, algo=algo, debug=debug)
