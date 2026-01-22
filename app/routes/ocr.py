@@ -21,11 +21,9 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extension
 
 
-
 @ocr_bp.route('/single', methods=['POST'])
 @login_required
 def single_image_ocr():
-    """Process single image OCR and save to database"""
     if 'image' not in request.files:
         return jsonify({'error': 'No image file provided'}), 400
 
@@ -39,7 +37,7 @@ def single_image_ocr():
 
     try:
         start_time = time.time()
-        
+
         # Read image bytes
         image_bytes = file.read()
 
@@ -50,19 +48,19 @@ def single_image_ocr():
 
         # Calculate checksum
         checksum = hashlib.sha256(image_bytes).hexdigest()
-        
+
         # Save image file
         filename = secure_filename(file.filename)
         upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
         os.makedirs(upload_folder, exist_ok=True)
-        
+
         # Generate unique filename
         unique_filename = f"{current_user.id}_{int(time.time())}_{filename}"
         file_path = os.path.join(upload_folder, unique_filename)
-        
+
         with open(file_path, 'wb') as f:
             f.write(image_bytes)
-        
+
         # Save Image record to database
         image = Image(
             user_id=current_user.id,
@@ -85,17 +83,17 @@ def single_image_ocr():
         processed_text = processor.process(raw_text)
 
         bart_output = run_bart_model(processed_text)
-        
+
         # Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
-        
+
         # Calculate average confidence
         confidence_avg = None
         if segments:
             confidences = [seg.get('confidence', 0) for seg in segments if 'confidence' in seg]
             if confidences:
                 confidence_avg = sum(confidences) / len(confidences)
-        
+
         # Save OCR Result
         ocr_result = OCRResult(
             image_id=image.id,
@@ -112,7 +110,7 @@ def single_image_ocr():
         )
         db.session.add(ocr_result)
         db.session.flush()  # Get ocr_result.id
-        
+
         # Save OCR Segments
         for idx, seg in enumerate(segments):
             bbox = seg.get('bbox', [])
@@ -127,7 +125,7 @@ def single_image_ocr():
                 position=idx
             )
             db.session.add(ocr_segment)
-        
+
         # Create Work with text block
         work = Work(
             user_id=current_user.id,
@@ -136,7 +134,7 @@ def single_image_ocr():
         )
         db.session.add(work)
         db.session.flush()  # Get work.id
-        
+
         # Create initial text block with OCR result
         text_block = TextBlock(
             work_id=work.id,
@@ -146,7 +144,7 @@ def single_image_ocr():
             position=0
         )
         db.session.add(text_block)
-        
+
         db.session.commit()
 
         return jsonify({

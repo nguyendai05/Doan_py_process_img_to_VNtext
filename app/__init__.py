@@ -3,6 +3,9 @@ from flask import Flask, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_cors import CORS
+
+from dotenv import load_dotenv
+load_dotenv()
 from app.config import Config
 
 db = SQLAlchemy()
@@ -12,7 +15,7 @@ login_manager = LoginManager()
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    
+
     # Ensure TTS output folder exists
     tts_folder = app.config.get('TTS_OUTPUT_FOLDER', 'app/static/audio')
     os.makedirs(tts_folder, exist_ok=True)

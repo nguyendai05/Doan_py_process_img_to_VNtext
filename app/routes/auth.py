@@ -67,7 +67,7 @@ def login():
 
     user.update_last_login()
     db.session.commit()
-    
+
     login_user(user)
 
     return jsonify({
