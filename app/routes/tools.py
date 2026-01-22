@@ -1,8 +1,11 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
+from app.services.translation_model_service import TranslationModelService
 from app.services.tts_service import TTSService
 from app.services.translate_service import TranslateService
 from app.services.research_service import ResearchService
+
+from app.services.summarize_service import SummarizeService
 
 tools_bp = Blueprint('tools', __name__)
 
@@ -168,4 +171,75 @@ def research_text():
     service = ResearchService()
     result = service.analyze(text, analysis_type)
 
+    return jsonify(result)
+
+@tools_bp.route('/translate-model-all', methods=['POST'])
+@login_required
+def translate_all_by_model():
+    """
+    Dịch bằng MODEL (Vi -> En) cho text dài (chunking bên service xử lý).
+    """
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({'success': False, 'error': 'No text provided', 'error_code': 'EMPTY_TEXT'}), 400
+
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'success': False, 'error': 'Text is empty', 'error_code': 'EMPTY_TEXT'}), 400
+
+    # Cho phép dài hơn translate cũ (vì model có chunking)
+    max_len = current_app.config.get('MAX_MODEL_TEXT_LENGTH', 20000)
+    if len(text) > max_len:
+        return jsonify({
+            'success': False,
+            'error': f'Text too long. Max {max_len} characters',
+            'error_code': 'TEXT_TOO_LONG'
+        }), 400
+
+    try:
+        service = TranslationModelService(model_dir=r"D:\FinetuneWork\opus-vi-en-100k-final")
+        result = service.translate(text)
+
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'translated_text': result['translated_text'],
+                'device': result.get('device', 'cpu'),
+                'chunks_count': result.get('chunks_count', 1)
+            })
+
+        return jsonify({'success': False, 'error': 'Translation failed', 'error_code': 'TRANSLATION_FAILED'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e), 'error_code': 'TRANSLATION_FAILED'}), 500
+
+# tom tắt
+@tools_bp.route('/summarize', methods=['POST'])
+@login_required
+def summarize_text():
+    """
+    NEW endpoint: /api/tools/summarize
+    """
+    data = request.get_json()
+
+    if not data or 'text' not in data:
+        return jsonify({'success': False, 'error': 'No text provided', 'error_code': 'EMPTY_TEXT'}), 400
+
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'success': False, 'error': 'Text is empty', 'error_code': 'EMPTY_TEXT'}), 400
+
+    # dùng cùng MAX_TEXT_LENGTH hiện có (đang 2000) :contentReference[oaicite:3]{index=3}
+    max_length = current_app.config.get('MAX_TEXT_LENGTH', 2000)
+    if len(text) > max_length:
+        return jsonify({
+            'success': False,
+            'error': f'Text too long. Max {max_length} characters',
+            'error_code': 'TEXT_TOO_LONG'
+        }), 400
+
+    algo = data.get('algo', 'heuristic7')   # heuristic7 | textrank
+    debug = bool(data.get('debug', True))
+
+    service = SummarizeService()
+    result = service.summarize(text, algo=algo, debug=debug)
     return jsonify(result)
