@@ -139,6 +139,7 @@ function renderAuthSection() {
 }
 
 function showLoginModal() {
+    elements.modalContent.classList.add('modal-auth');
     elements.modalContent.innerHTML = `
         <div class="modal-header">
             <h3>Đăng nhập</h3>
@@ -160,6 +161,7 @@ function showLoginModal() {
 }
 
 function showRegisterModal() {
+    elements.modalContent.classList.add('modal-auth');
     elements.modalContent.innerHTML = `
         <div class="modal-header">
             <h3>Đăng ký</h3>
@@ -253,6 +255,8 @@ function closeModal() {
         ttsState.currentAudio.currentTime = 0;
         ttsState.currentAudio = null;
     }
+    // Remove auth modal class if present
+    elements.modalContent.classList.remove('modal-auth');
     elements.modalOverlay.classList.add('hidden');
 }
 

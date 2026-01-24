@@ -783,6 +783,36 @@ textarea.text-block-content.editable:focus {
     color: var(--error);
 }
 
+/* ===== AUTH MODAL (Login/Register) - Smaller size ===== */
+.modal-content.modal-auth {
+    max-width: 400px;
+    width: 90%;
+    padding: 1.5rem;
+}
+
+.modal-content.modal-auth .modal-header {
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+}
+
+.modal-content.modal-auth .modal-header h3 {
+    font-size: 1.125rem;
+}
+
+.modal-content.modal-auth .form-group {
+    margin-bottom: 1rem;
+}
+
+.modal-content.modal-auth .form-group input {
+    padding: 0.75rem 0.875rem;
+    font-size: 0.9375rem;
+}
+
+.modal-content.modal-auth .btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+}
+
 /* ===== FORMS ===== */
 .form-group {
     margin-bottom: 1.25rem;
