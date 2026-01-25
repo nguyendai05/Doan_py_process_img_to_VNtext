@@ -7,7 +7,6 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models import Image, OCRResult, OCRSegment, Work, TextBlock
 from app.services.ocr_service import OCRService
-from app.services.text_processing import TextProcessor
 from app.services.model_inference import run_bart_model
 
 ocr_bp = Blueprint('ocr', __name__)
